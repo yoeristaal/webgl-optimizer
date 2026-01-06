@@ -1,0 +1,17 @@
+{
+  "name": "com.yoeristaal.webgloptimizer",
+  "displayName": "WebGL Optimizer",
+  "version": "2.0.0",
+  "unity": "6000.3.1f1",
+  "description": "Optimizer tools for WebGL builds. Based on CrazyGames' original optimizer library, adapted for Unity 6.3.",
+  "author": {
+    "name": "Yoeri Staal",
+    "url": "https://github.com/yoeristaal"
+  },
+  "contributors": [
+    {
+      "name": "CrazyGames",
+      "url": "https://www.crazygames.com"
+    }
+  ]
+}
