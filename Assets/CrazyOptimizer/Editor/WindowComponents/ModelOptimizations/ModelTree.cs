@@ -10,7 +10,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
 {
     class ModelTree : TreeViewWithTreeModel<ModelTreeItem>
     {
-        public ModelTree(TreeViewState treeViewState, MultiColumnHeader multiColumnHeader, TreeModel<ModelTreeItem> model)
+        public ModelTree(TreeViewState<int> treeViewState, MultiColumnHeader multiColumnHeader, TreeModel<ModelTreeItem> model)
             : base(treeViewState, multiColumnHeader, model)
         {
             showBorder = true;
@@ -19,7 +19,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
             Reload();
         }
 
-        void SortIfNeeded(TreeViewItem root, IList<TreeViewItem> rows)
+        void SortIfNeeded(TreeViewItem<int> root, IList<TreeViewItem<int>> rows)
         {
             if (rows.Count <= 1)
                 return;
@@ -34,7 +34,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
             if (sortedColumns.Length == 0)
                 return;
 
-            var items = rootItem.children.Cast<TreeViewItem<ModelTreeItem>>().OrderBy(i => i.data.ModelName);
+            var items = rootItem.children.Cast<TreeViewItemData<ModelTreeItem>>().OrderBy(i => i.data.ModelName);
             var sortedColumnIndex = sortedColumns[0];
             var ascending = multiColumnHeader.IsSortedAscending(sortedColumnIndex);
 
@@ -60,12 +60,12 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
                     break;
             }
 
-            rootItem.children = items.Cast<TreeViewItem>().ToList();
+            rootItem.children = items.Cast<TreeViewItem<int>>().ToList();
             TreeToList(root, rows);
             Repaint();
         }
 
-        public static void TreeToList(TreeViewItem root, IList<TreeViewItem> result)
+        public static void TreeToList(TreeViewItem<int> root, IList<TreeViewItem<int>> result)
         {
             if (root == null)
                 throw new NullReferenceException("root");
@@ -77,14 +77,14 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
             if (root.children == null)
                 return;
 
-            Stack<TreeViewItem> stack = new Stack<TreeViewItem>();
+            Stack<TreeViewItem<int>> stack = new Stack<TreeViewItem<int>>();
 
             for (int i = root.children.Count - 1; i >= 0; i--)
                 stack.Push(root.children[i]);
 
             while (stack.Count > 0)
             {
-                TreeViewItem current = stack.Pop();
+                TreeViewItem<int> current = stack.Pop();
                 result.Add(current);
 
                 if (current.hasChildren && current.children[0] != null)
@@ -102,7 +102,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
             SortIfNeeded(rootItem, GetRows());
         }
 
-        protected override IList<TreeViewItem> BuildRows(TreeViewItem root)
+        protected override IList<TreeViewItem<int>> BuildRows(TreeViewItem<int> root)
         {
             var rows = base.BuildRows(root);
             SortIfNeeded(root, rows);
@@ -111,7 +111,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
 
         protected override void RowGUI(RowGUIArgs args)
         {
-            var item = (TreeViewItem<ModelTreeItem>)args.item;
+            var item = (TreeViewItemData<ModelTreeItem>)args.item;
 
             for (int i = 0; i < args.GetNumVisibleColumns(); ++i)
             {
@@ -119,7 +119,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
             }
         }
 
-        private void CellGUI(Rect cellRect, TreeViewItem<ModelTreeItem> item, int column, ref RowGUIArgs args)
+        private void CellGUI(Rect cellRect, TreeViewItemData<ModelTreeItem> item, int column, ref RowGUIArgs args)
         {
             CenterRectUsingSingleLineHeight(ref cellRect);
             switch (column)

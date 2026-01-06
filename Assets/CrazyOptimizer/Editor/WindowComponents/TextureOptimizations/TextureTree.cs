@@ -10,7 +10,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
 {
     class TextureTree : TreeViewWithTreeModel<TextureTreeItem>
     {
-        public TextureTree(TreeViewState treeViewState, MultiColumnHeader multiColumnHeader, TreeModel<TextureTreeItem> model)
+        public TextureTree(TreeViewState<int> treeViewState, MultiColumnHeader multiColumnHeader, TreeModel<TextureTreeItem> model)
             : base(treeViewState, multiColumnHeader, model)
         {
             showBorder = true;
@@ -19,7 +19,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             Reload();
         }
 
-        void SortIfNeeded(TreeViewItem root, IList<TreeViewItem> rows)
+        void SortIfNeeded(TreeViewItem<int> root, IList<TreeViewItem<int>> rows)
         {
             if (rows.Count <= 1)
                 return;
@@ -29,13 +29,12 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                 return; // No column to sort for (just use the order the data are in)
             }
 
-
             var sortedColumns = multiColumnHeader.state.sortedColumns;
 
             if (sortedColumns.Length == 0)
                 return;
 
-            var items = rootItem.children.Cast<TreeViewItem<TextureTreeItem>>().OrderBy(i => i.data.TextureName);
+            var items = rootItem.children.Cast<TreeViewItemData<TextureTreeItem>>().OrderBy(i => i.data.TextureName);
             var sortedColumnIndex = sortedColumns[0];
             var ascending = multiColumnHeader.IsSortedAscending(sortedColumnIndex);
             switch (sortedColumnIndex)
@@ -60,12 +59,12 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                     break;
             }
 
-            rootItem.children = items.Cast<TreeViewItem>().ToList();
+            rootItem.children = items.Cast<TreeViewItem<int>>().ToList();
             TreeToList(root, rows);
             Repaint();
         }
 
-        public static void TreeToList(TreeViewItem root, IList<TreeViewItem> result)
+        public static void TreeToList(TreeViewItem<int> root, IList<TreeViewItem<int>> result)
         {
             if (root == null)
                 throw new NullReferenceException("root");
@@ -77,13 +76,13 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             if (root.children == null)
                 return;
 
-            Stack<TreeViewItem> stack = new Stack<TreeViewItem>();
+            Stack<TreeViewItem<int>> stack = new Stack<TreeViewItem<int>>();
             for (int i = root.children.Count - 1; i >= 0; i--)
                 stack.Push(root.children[i]);
 
             while (stack.Count > 0)
             {
-                TreeViewItem current = stack.Pop();
+                TreeViewItem<int> current = stack.Pop();
                 result.Add(current);
 
                 if (current.hasChildren && current.children[0] != null)
@@ -96,13 +95,12 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             }
         }
 
-
         void OnSortingChanged(MultiColumnHeader multiColumnHeader)
         {
             SortIfNeeded(rootItem, GetRows());
         }
 
-        protected override IList<TreeViewItem> BuildRows(TreeViewItem root)
+        protected override IList<TreeViewItem<int>> BuildRows(TreeViewItem<int> root)
         {
             var rows = base.BuildRows(root);
             SortIfNeeded(root, rows);
@@ -111,7 +109,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
 
         protected override void RowGUI(RowGUIArgs args)
         {
-            var item = (TreeViewItem<TextureTreeItem>) args.item;
+            var item = (TreeViewItemData<TextureTreeItem>)args.item;
 
             for (int i = 0; i < args.GetNumVisibleColumns(); ++i)
             {
@@ -119,7 +117,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             }
         }
 
-        private void CellGUI(Rect cellRect, TreeViewItem<TextureTreeItem> item, int column, ref RowGUIArgs args)
+        private void CellGUI(Rect cellRect, TreeViewItemData<TextureTreeItem> item, int column, ref RowGUIArgs args)
         {
             CenterRectUsingSingleLineHeight(ref cellRect);
             switch (column)

@@ -10,7 +10,7 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
 {
     class BuildLogTree : TreeViewWithTreeModel<BuildLogTreeItem>
     {
-        public BuildLogTree(TreeViewState treeViewState, MultiColumnHeader multiColumnHeader, TreeModel<BuildLogTreeItem> model)
+        public BuildLogTree(TreeViewState<int> treeViewState, MultiColumnHeader multiColumnHeader, TreeModel<BuildLogTreeItem> model)
             : base(treeViewState, multiColumnHeader, model)
         {
             showBorder = true;
@@ -19,7 +19,7 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
             Reload();
         }
 
-        void SortIfNeeded(TreeViewItem root, IList<TreeViewItem> rows)
+        void SortIfNeeded(TreeViewItem<int> root, IList<TreeViewItem<int>> rows)
         {
             if (rows.Count <= 1)
                 return;
@@ -29,13 +29,12 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
                 return; // No column to sort for (just use the order the data are in)
             }
 
-
             var sortedColumns = multiColumnHeader.state.sortedColumns;
 
             if (sortedColumns.Length == 0)
                 return;
 
-            var items = rootItem.children.Cast<TreeViewItem<BuildLogTreeItem>>().OrderBy(i => i.data.size);
+            var items = rootItem.children.Cast<TreeViewItemData<BuildLogTreeItem>>().OrderBy(i => i.data.size);
             var sortedColumnIndex = sortedColumns[0];
             var ascending = multiColumnHeader.IsSortedAscending(sortedColumnIndex);
             switch (sortedColumnIndex)
@@ -51,12 +50,12 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
                     break;
             }
 
-            rootItem.children = items.Cast<TreeViewItem>().ToList();
+            rootItem.children = items.Cast<TreeViewItem<int>>().ToList();
             TreeToList(root, rows);
             Repaint();
         }
 
-        public static void TreeToList(TreeViewItem root, IList<TreeViewItem> result)
+        public static void TreeToList(TreeViewItem<int> root, IList<TreeViewItem<int>> result)
         {
             if (root == null)
                 throw new NullReferenceException("root");
@@ -68,13 +67,13 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
             if (root.children == null)
                 return;
 
-            Stack<TreeViewItem> stack = new Stack<TreeViewItem>();
+            Stack<TreeViewItem<int>> stack = new Stack<TreeViewItem<int>>();
             for (int i = root.children.Count - 1; i >= 0; i--)
                 stack.Push(root.children[i]);
 
             while (stack.Count > 0)
             {
-                TreeViewItem current = stack.Pop();
+                TreeViewItem<int> current = stack.Pop();
                 result.Add(current);
 
                 if (current.hasChildren && current.children[0] != null)
@@ -87,13 +86,12 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
             }
         }
 
-
         void OnSortingChanged(MultiColumnHeader multiColumnHeader)
         {
             SortIfNeeded(rootItem, GetRows());
         }
 
-        protected override IList<TreeViewItem> BuildRows(TreeViewItem root)
+        protected override IList<TreeViewItem<int>> BuildRows(TreeViewItem<int> root)
         {
             var rows = base.BuildRows(root);
             SortIfNeeded(root, rows);
@@ -102,7 +100,7 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
 
         protected override void RowGUI(RowGUIArgs args)
         {
-            var item = (TreeViewItem<BuildLogTreeItem>) args.item;
+            var item = (TreeViewItemData<BuildLogTreeItem>)args.item;
 
             for (int i = 0; i < args.GetNumVisibleColumns(); ++i)
             {
@@ -110,7 +108,7 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
             }
         }
 
-        private void CellGUI(Rect cellRect, TreeViewItem<BuildLogTreeItem> item, int column, ref RowGUIArgs args)
+        private void CellGUI(Rect cellRect, TreeViewItemData<BuildLogTreeItem> item, int column, ref RowGUIArgs args)
         {
             CenterRectUsingSingleLineHeight(ref cellRect);
             switch (column)
