@@ -61,6 +61,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             BuildExplanation("Crunch compression",
                 "All the textures with crunch compression enabled will be compressed together, decreasing the final build size.");
             BuildExplanation("Crunch comp. quality", "A higher compression quality means larger textures and longer compression times.");
+            BuildExplanation("Override for WebGL", "When enabled, allows platform-specific settings for WebGL builds.");
         }
 
         static void BuildExplanation(string label, string explanation)
@@ -115,7 +116,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
         static List<string> GetUsedTexturesInResources()
         {
             var usedTexturePaths = new HashSet<string>();
-            var allAssetPaths = AssetDatabase.FindAssets("", new[] {"Assets"}).Select(AssetDatabase.GUIDToAssetPath).ToList();
+            var allAssetPaths = AssetDatabase.FindAssets("", new[] { "Assets" }).Select(AssetDatabase.GUIDToAssetPath).ToList();
 
             // keep only the assets inside a Resources folder, that is not inside an Editor folder
             var rx = new Regex(@"\w*(?<!Editor\/)Resources\/", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -139,6 +140,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
 
         static void AnalyzeTextures()
         {
+            Debug.Log("AnalyzeTextures button clicked - Starting analysis...");
             _isAnalyzing = true;
             if (OptimizerWindow.EditorWindowInstance != null)
             {
@@ -150,29 +152,37 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             GetUsedTexturesInBuildScenes().ForEach(path => usedTexturePaths.Add(path));
             GetUsedTexturesInResources().ForEach(path => usedTexturePaths.Add(path));
 
+            Debug.Log($"Found {usedTexturePaths.Count} unique textures in build scenes and resources");
+
             var treeElements = new List<TextureTreeItem>();
             var idIncrement = 0;
             var root = new TextureTreeItem("Root", -1, idIncrement, null, null);
             treeElements.Add(root);
 
+            Debug.Log($"Processing {usedTexturePaths.Count} texture paths...");
+
             foreach (var texturePath in usedTexturePaths)
             {
                 if (texturePath.StartsWith("Packages/") && !_includeFilesFromPackages)
                 {
+                    Debug.Log($"Skipping package texture: {texturePath}");
                     continue;
                 }
 
                 idIncrement++;
                 try
                 {
-                    var textureImporter = (TextureImporter) AssetImporter.GetAtPath(texturePath);
+                    var textureImporter = (TextureImporter)AssetImporter.GetAtPath(texturePath);
                     treeElements.Add(new TextureTreeItem("Texture2D", 0, idIncrement, texturePath, textureImporter));
+                    Debug.Log($"Added texture: {texturePath}");
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
-                    Debug.LogWarning("Failed to analyze texture at path: " + texturePath);
+                    Debug.LogWarning($"Failed to analyze texture at path: {texturePath}. Error: {e.Message}");
                 }
             }
+
+            Debug.Log($"Created tree with {treeElements.Count} elements (including root)");
 
             var treeModel = new TreeModel<TextureTreeItem>(treeElements);
             var treeViewState = new TreeViewState();
@@ -188,9 +198,12 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                         {headerContent = new GUIContent() {text = "Crunch compression"}, width = 120, minWidth = 120, canSort = true},
                     new MultiColumnHeaderState.Column()
                         {headerContent = new GUIContent() {text = "Crunch comp. quality"}, width = 128, minWidth = 128, canSort = true},
+                    new MultiColumnHeaderState.Column()
+                        {headerContent = new GUIContent() {text = "Override for WebGL"}, width = 120, minWidth = 120, canSort = true},
                 });
             _textureCompressionTree = new TextureTree(treeViewState, new MultiColumnHeader(_multiColumnHeaderState), treeModel);
             _isAnalyzing = false;
+            Debug.Log("Analysis complete!");
             if (OptimizerWindow.EditorWindowInstance != null)
             {
                 OptimizerWindow.EditorWindowInstance.Repaint();

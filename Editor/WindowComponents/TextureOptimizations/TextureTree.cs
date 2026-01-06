@@ -52,10 +52,13 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                     items = items.Order(i => i.data.TextureCompressionName, ascending);
                     break;
                 case 4:
-                    items = items.Order(i => i.data.CrunchCompressionQuality, ascending);
+                    items = items.Order(i => i.data.HasCrunchCompression, ascending);
                     break;
                 case 5:
                     items = items.Order(i => i.data.CrunchCompressionQuality, ascending);
+                    break;
+                case 6:
+                    items = items.Order(i => i.data.OverrideStatus, ascending);
                     break;
             }
 
@@ -139,6 +142,9 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                     break;
                 case 5:
                     GUI.Label(cellRect, item.data.CrunchCompressionQuality.ToString());
+                    break;
+                case 6:
+                    GUI.Label(cellRect, item.data.OverrideStatus);
                     break;
             }
         }

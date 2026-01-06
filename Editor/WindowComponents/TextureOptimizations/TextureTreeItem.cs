@@ -16,6 +16,25 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
         public TextureImporterFormat TextureFormat => _platformSettings.format;
         public TextureImporterType TextureType => _textureImporter.textureType;
         public TextureImporterCompression TextureCompression => _textureImporter.textureCompression;
+        public bool HasWebGLOverride => _webGLSettings.overridden;
+        public bool HasStandaloneOverride => _standaloneSettings.overridden;
+
+        public string OverrideStatus
+        {
+            get
+            {
+                bool webgl = HasWebGLOverride;
+                bool standalone = HasStandaloneOverride;
+
+                if (webgl && standalone)
+                    return "Both";
+                if (webgl)
+                    return "WebGL";
+                if (standalone)
+                    return "Windows";
+                return "None";
+            }
+        }
 
         public string TextureCompressionName
         {
@@ -39,6 +58,8 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
 
         private readonly TextureImporter _textureImporter;
         private readonly TextureImporterPlatformSettings _platformSettings;
+        private readonly TextureImporterPlatformSettings _webGLSettings;
+        private readonly TextureImporterPlatformSettings _standaloneSettings;
 
         public TextureTreeItem(string name, int depth, int id, string texturePath, TextureImporter textureImporter) : base(name, depth, id)
         {
@@ -50,6 +71,8 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
 
             _textureImporter = textureImporter;
             _platformSettings = _textureImporter.GetPlatformTextureSettings("WebGL");
+            _webGLSettings = _textureImporter.GetPlatformTextureSettings("WebGL");
+            _standaloneSettings = _textureImporter.GetPlatformTextureSettings("Standalone");
         }
     }
 }
