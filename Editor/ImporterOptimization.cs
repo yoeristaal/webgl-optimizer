@@ -47,6 +47,7 @@ namespace CrazyGames
                 facts.UncompressedTexture = settings.textureCompression == TextureImporterCompression.Uncompressed;
                 facts.AutomaticTextureFormat = settings.format == TextureImporterFormat.Automatic;
                 facts.TextureMaxSize = settings.maxTextureSize;
+                facts.CrunchEligible = CanEnableCrunch(texture, settings, _platform);
             }
             else if (kind == OptimizationAssetKind.Model && _importer is ModelImporter model)
             {
@@ -79,17 +80,28 @@ namespace CrazyGames
                 importer.GetOverrideSampleSettings(platform) : importer.defaultSampleSettings;
         }
 
+        internal static bool CanEnableCrunch(TextureImporter importer, TextureImporterPlatformSettings settings, string platform)
+        {
+            if (string.IsNullOrEmpty(platform) || importer.textureShape != TextureImporterShape.Texture2D ||
+                settings.crunchedCompression || settings.format != TextureImporterFormat.Automatic ||
+                settings.textureCompression == TextureImporterCompression.Uncompressed) return false;
+            var format = importer.GetAutomaticFormat(platform);
+            return format == TextureImporterFormat.DXT1 || format == TextureImporterFormat.DXT5 ||
+                format == TextureImporterFormat.ETC_RGB4 || format == TextureImporterFormat.ETC2_RGBA8;
+        }
+
         public void Apply(OptimizationRule rule)
         {
             if (ContextKey != _contextKey)
                 throw new InvalidOperationException("The active build profile changed. Refresh recommendations before applying fixes");
             if (string.IsNullOrEmpty(_platform) && (rule == OptimizationRule.TextureCompression ||
-                rule == OptimizationRule.TextureMaxSize || rule == OptimizationRule.AudioQuality))
+                rule == OptimizationRule.TextureMaxSize || rule == OptimizationRule.TextureCrunch || rule == OptimizationRule.AudioQuality))
                 throw new InvalidOperationException("The active platform does not support importer overrides");
             switch (rule)
             {
                 case OptimizationRule.TextureCompression:
                 case OptimizationRule.TextureMaxSize:
+                case OptimizationRule.TextureCrunch:
                     var texture = _importer as TextureImporter;
                     if (texture == null) throw new InvalidOperationException("Texture importer is missing");
                     var textureSettings = EffectiveTextureSettings(texture, _platform);
@@ -100,6 +112,12 @@ namespace CrazyGames
                         if (textureSettings.format != TextureImporterFormat.Automatic)
                             throw new InvalidOperationException("Explicit texture formats must be reviewed manually");
                         textureSettings.textureCompression = TextureImporterCompression.Compressed;
+                    }
+                    else if (rule == OptimizationRule.TextureCrunch)
+                    {
+                        if (!CanEnableCrunch(texture, textureSettings, _platform))
+                            throw new InvalidOperationException("The effective texture format does not support this Crunch fix");
+                        textureSettings.crunchedCompression = true;
                     }
                     else
                         textureSettings.maxTextureSize = Math.Min(textureSettings.maxTextureSize, 1024);

@@ -9,7 +9,7 @@ namespace CrazyGames
     internal enum OptimizationRule
     {
         TextureCompression, TextureMaxSize, ModelReadWrite, ModelPolygons,
-        ModelVertices, ModelCompression, AudioQuality
+        ModelVertices, ModelCompression, AudioQuality, TextureCrunch
     }
 
     internal sealed class OptimizationRecommendation
@@ -32,6 +32,7 @@ namespace CrazyGames
         public OptimizationAssetKind Kind;
         public bool UncompressedTexture;
         public bool AutomaticTextureFormat;
+        public bool CrunchEligible;
         public int TextureMaxSize;
         public bool ModelReadable;
         public bool OptimizePolygons;
@@ -59,6 +60,10 @@ namespace CrazyGames
                     Add(result, facts, OptimizationRule.TextureMaxSize, OptimizationSeverity.Medium,
                         "Review texture resolution", $"{platform} max size: {facts.TextureMaxSize} → 1024",
                         $"A lower resolution can reduce memory and build size. Check the texture at its largest on-screen size before keeping this change. Creates a {platform} override if needed.");
+                if (facts.CrunchEligible)
+                    Add(result, facts, OptimizationRule.TextureCrunch, OptimizationSeverity.Low,
+                        "Enable Crunch compression", $"{platform} Crunch compression: Disabled → Enabled",
+                        $"Crunch can reduce build and download size, with longer import times and extra decompression work at load time. Review visual quality. Creates a {platform} override if needed.");
             }
             else if (facts.Kind == OptimizationAssetKind.Model)
             {
@@ -92,6 +97,14 @@ namespace CrazyGames
                 .ThenBy(issue => issue.Rule).ToList();
         }
 
+        public static List<RecommendationGroup> Summarize(IEnumerable<OptimizationRecommendation> issues)
+        {
+            return issues.GroupBy(issue => issue.Rule)
+                .Select(group => new RecommendationGroup(group.Key, group
+                    .GroupBy(issue => issue.Path, StringComparer.Ordinal).Select(asset => asset.First()).ToArray()))
+                .OrderBy(group => group.Issues[0].Severity).ThenBy(group => group.Rule).ToList();
+        }
+
         private static void Add(List<OptimizationRecommendation> result, OptimizationFacts facts,
             OptimizationRule rule, OptimizationSeverity severity, string title, string change, string explanation)
         {
@@ -101,5 +114,33 @@ namespace CrazyGames
                 Change = change, Explanation = explanation, ContextKey = facts.ContextKey
             });
         }
+    }
+
+    internal sealed class RecommendationGroup
+    {
+        public readonly OptimizationRule Rule;
+        public readonly OptimizationRecommendation[] Issues;
+        public int AssetCount => Issues.Length;
+        public string Title => Rule == OptimizationRule.TextureMaxSize ? "Set maximum texture size to 1024 px" : Issues[0].Title;
+        public string ChangeSummary
+        {
+            get
+            {
+                switch (Rule)
+                {
+                    case OptimizationRule.TextureCompression: return "Compression → Normal";
+                    case OptimizationRule.TextureMaxSize: return "Maximum texture size → 1024 px";
+                    case OptimizationRule.TextureCrunch: return "Crunch compression → Enabled";
+                    case OptimizationRule.AudioQuality: return "Vorbis quality → 70%";
+                    case OptimizationRule.ModelReadWrite: return "Read/Write → Disabled";
+                    case OptimizationRule.ModelPolygons: return "Optimize polygons → Enabled";
+                    case OptimizationRule.ModelVertices: return "Optimize vertices → Enabled";
+                    case OptimizationRule.ModelCompression: return "Mesh compression → Low";
+                    default: throw new ArgumentOutOfRangeException();
+                }
+            }
+        }
+        public RecommendationGroup(OptimizationRule rule, OptimizationRecommendation[] issues)
+        { Rule = rule; Issues = issues; }
     }
 }

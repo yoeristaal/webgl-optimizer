@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.3.0] - 2026-10-11
+
+### Added
+- Recommendation summaries grouped by fix type, with affected asset counts and batch preview/execution buttons for each group.
+- Direct previews for assets selected in the table and individual fixes, with the execution button above the summary.
+- Crunch compression recommendations and batch fixes for compatible automatic 2D texture formats on the active platform.
+
+### Changed
+- Individual recommendations are now an optional detail view instead of the default long list.
+- Asset analysis and recommendation scans run again automatically after batch execution or restoration, including partial batches.
+
 ## [2.2.1] - 2026-10-11
 
 ### Fixed
