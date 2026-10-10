@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.0] - 2026-10-10
+
+### Added
+- Ranked texture, model, and audio recommendations with severity, explanations, and exact change previews.
+- Batch fixes for checked recommendations, including selection of recommendations for assets selected in a table.
+- Persistent importer backups and a Restore last batch action that preserves newer manual edits.
+- Cancellable recommendation scans and batch operations, with automatic table refresh after changes.
+
 ## [2.0.8] - 2026-10-10
 
 ### Added

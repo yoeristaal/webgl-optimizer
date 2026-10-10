@@ -13,6 +13,7 @@ namespace CrazyGames
     public class OptimizerWindow : EditorWindow
     {
         private int _toolbarInt = 0;
+        private Vector2 _scrollPosition;
         private readonly string[] _toolbarStrings = { "Export", "Textures", "Models", "Build Profiles", "Audio clips", "Build logs", "About" };
         public static EditorWindow EditorWindowInstance;
 
@@ -30,9 +31,10 @@ namespace CrazyGames
 
         void OnGUI()
         {
+            _toolbarInt = GUILayout.Toolbar(_toolbarInt, _toolbarStrings);
+            _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
             EditorGUILayout.BeginVertical(EditorStyles.inspectorDefaultMargins);
 
-            _toolbarInt = GUILayout.Toolbar(_toolbarInt, _toolbarStrings);
             switch (_toolbarInt)
             {
                 case 0:
@@ -61,6 +63,7 @@ namespace CrazyGames
             GUILayout.Space(50);
             RenderCredits();
             EditorGUILayout.EndVertical();
+            EditorGUILayout.EndScrollView();
         }
 
         void RenderCredits()
@@ -99,6 +102,7 @@ namespace CrazyGames
             AudioOptimization.CancelAnalysis();
             BuildProfileOptimization.CancelAnalysis();
             BuildLogs.CancelAnalysis();
+            RecommendationPanel.CancelChanges();
             EditorWindowInstance = null;
         }
     }

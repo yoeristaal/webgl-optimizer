@@ -13,6 +13,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
         private static TextureTree _textureCompressionTree;
 
         private static readonly AnalysisJob _analysis = new AnalysisJob();
+        private static readonly RecommendationPanel _recommendations = new RecommendationPanel(OptimizationAssetKind.Texture);
         private static bool _includeFilesFromPackages;
 
         public static void RenderGUI()
@@ -51,6 +52,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
 
             EditorGUILayout.EndHorizontal();
             _analysis.RenderStatus();
+            _recommendations.Render(_textureCompressionTree, item => item.TexturePath, _analysis.IsRunning, AnalyzeTextures);
             EditorGUILayout.Space(5);
 
             GUILayout.Label(
@@ -78,7 +80,11 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             EditorGUILayout.EndHorizontal();
         }
 
-        internal static void CancelAnalysis() => _analysis.Cancel();
+        internal static void CancelAnalysis()
+        {
+            _analysis.Cancel();
+            _recommendations.CancelScan();
+        }
 
         static void AnalyzeTextures()
         {

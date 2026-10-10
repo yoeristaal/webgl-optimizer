@@ -36,6 +36,14 @@ You can toggle the "Include files from Packages" options to also display texture
 
 ![Texture optimizations](Docs/textures.png?raw=true "Texture optimizations")
 
+## Recommendations and batch fixes
+
+After analyzing textures, models, or audio clips, expand **Recommendations and batch fixes** and click **Find / refresh recommendations**. Recommendations are ranked by severity and explain their proposed setting changes and tradeoffs.
+
+Check individual recommendations, or select assets in the table and click **Check recommendations for selected assets**. Click **Preview checked fixes**, review the changes, then **Apply previewed fixes**. Changes are grouped by asset so each asset is reimported once. Texture and audio fixes create or update WebGL overrides; model fixes affect every platform. Package assets and assets that are not editable are excluded from fixes.
+
+**Restore last batch** restores saved importer settings. It skips assets whose settings have since changed, preserving newer edits. Restore history is kept in `Library/WebGLOptimizer/ImporterHistory.json` and survives editor reloads; deleting the Library folder deletes that history. Cancelling a batch stops remaining work, and completed changes remain restorable. Individual Unity reimports finish before cancellation takes effect.
+
 ## Model optimizations
 
 The model optimizations tool works very similar to the texture optimizations tool, but instead of textures it finds models in your project and provides various tips about optimizing them.

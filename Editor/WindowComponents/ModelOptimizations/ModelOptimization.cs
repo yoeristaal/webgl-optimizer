@@ -13,6 +13,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
         private static ModelTree _modelTree;
 
         private static readonly AnalysisJob _analysis = new AnalysisJob();
+        private static readonly RecommendationPanel _recommendations = new RecommendationPanel(OptimizationAssetKind.Model);
         private static bool _includeFilesFromPackages;
 
         private static readonly List<string> _modelFormats = new List<string>() { ".fbx", ".dae", ".3ds", ".dxf", ".obj" };
@@ -54,6 +55,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
 
             EditorGUILayout.EndHorizontal();
             _analysis.RenderStatus();
+            _recommendations.Render(_modelTree, item => item.ModelPath, _analysis.IsRunning, AnalyzeModels);
             EditorGUILayout.Space(5);
 
             GUILayout.Label(
@@ -87,7 +89,11 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
                    _modelFormats.Contains(System.IO.Path.GetExtension(assetDependency).ToLowerInvariant());
         }
 
-        internal static void CancelAnalysis() => _analysis.Cancel();
+        internal static void CancelAnalysis()
+        {
+            _analysis.Cancel();
+            _recommendations.CancelScan();
+        }
 
         static void AnalyzeModels()
         {

@@ -12,7 +12,19 @@ namespace CrazyGames
         private int _skipped;
         private string _message;
         private MessageType _messageType;
+        private readonly string _completedMessage;
+        private readonly string _cancelledMessage;
+        private readonly string _failureMessage;
         public bool IsRunning => _steps != null;
+
+        public AnalysisJob(string completedMessage = "Analysis complete.",
+            string cancelledMessage = "Analysis cancelled. Previous results retained.",
+            string failureMessage = "Previous results retained.")
+        {
+            _completedMessage = completedMessage;
+            _cancelledMessage = cancelledMessage;
+            _failureMessage = failureMessage;
+        }
 
         public void Start(Func<IEnumerator<string>> createSteps)
         {
@@ -47,8 +59,8 @@ namespace CrazyGames
                 {
                     if (!_steps.MoveNext())
                     {
-                        _message = _skipped == 0 ? "Analysis complete." :
-                            $"Analysis complete. Skipped {_skipped} item(s); see the Console for paths and reasons.";
+                        _message = _skipped == 0 ? _completedMessage :
+                            $"{_completedMessage} Skipped {_skipped} item(s); see the Console for paths and reasons.";
                         _messageType = _skipped == 0 ? MessageType.Info : MessageType.Warning;
                         Stop();
                         break;
@@ -74,7 +86,7 @@ namespace CrazyGames
         {
             if (!IsRunning)
                 return;
-            _message = "Analysis cancelled. Previous results retained.";
+            _message = _cancelledMessage;
             _messageType = MessageType.Info;
             try { Stop(); }
             catch (Exception exception) { Fail(exception); }
@@ -83,7 +95,7 @@ namespace CrazyGames
 
         private void Fail(Exception exception)
         {
-            _message = $"Analysis failed: {exception.Message}. Previous results retained.";
+            _message = $"Operation failed: {exception.Message}. {_failureMessage}";
             _messageType = MessageType.Error;
             Debug.LogException(exception);
             try { Stop(); }

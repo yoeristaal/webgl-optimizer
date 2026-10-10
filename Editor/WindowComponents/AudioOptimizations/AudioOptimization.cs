@@ -13,6 +13,7 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
         private static AudioTree _audioCompressionTree;
 
         private static readonly AnalysisJob _analysis = new AnalysisJob();
+        private static readonly RecommendationPanel _recommendations = new RecommendationPanel(OptimizationAssetKind.Audio);
         private static bool _includeFilesFromPackages;
 
         public static void RenderGUI()
@@ -51,6 +52,7 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
 
             EditorGUILayout.EndHorizontal();
             _analysis.RenderStatus();
+            _recommendations.Render(_audioCompressionTree, item => item.AudioPath, _analysis.IsRunning, AnalyzeAudio);
             EditorGUILayout.Space(5);
 
             GUILayout.Label(
@@ -76,7 +78,11 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
         }
 
 
-        internal static void CancelAnalysis() => _analysis.Cancel();
+        internal static void CancelAnalysis()
+        {
+            _analysis.Cancel();
+            _recommendations.CancelScan();
+        }
 
         static void AnalyzeAudio()
         {
