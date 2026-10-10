@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.2.1] - 2026-10-11
+
+### Fixed
+- Corrected the invalid GUID in RecommendationPanel.cs.meta that caused Unity to ignore the script and report missing RecommendationPanel errors in the texture, model, and audio tabs.
+
 ## [2.2.0] - 2026-10-10
 
 ### Added
