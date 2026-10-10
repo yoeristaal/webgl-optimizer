@@ -1,190 +1,176 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using UnityEditor;
-using UnityEditor.Rendering;
+using UnityEditor.Build;
+using UnityEditor.Build.Profile;
 using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace CrazyGames.WindowComponents
 {
+    internal sealed class ExportRecommendation
+    {
+        public string Title, Current, Recommended, Explanation;
+        public bool Satisfied;
+        public Action Fix;
+    }
+
     public class ExportOptimizations
     {
+        private static string _message, _messageContext;
+        private static MessageType _messageType;
+
+        internal static List<ExportRecommendation> GetRecommendations()
+        {
+            var items = new List<ExportRecommendation>();
+            if (ActivePlatform.Current.Target != BuildTarget.WebGL) return items;
+            Add(items, "Brotli compression", PlayerSettings.WebGL.compressionFormat, WebGLCompressionFormat.Brotli,
+                () => PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Brotli,
+                "Smaller downloads. Your host must serve the correct Content-Encoding header and support Brotli over HTTPS.");
+            Add(items, "Name files as hashes", PlayerSettings.WebGL.nameFilesAsHashes, true,
+                () => PlayerSettings.WebGL.nameFilesAsHashes = true,
+                "Changes filenames when content changes. Update any deployment scripts that rely on fixed build filenames.");
+            var exceptions = PlayerSettings.WebGL.exceptionSupport;
+            Add(items, "Exception support", exceptions, WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly,
+                () => PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly,
+                "Reduces exception overhead compared with full support. Test exception handling and diagnostics before release.",
+                exceptions == WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly || exceptions == WebGLExceptionSupport.None);
+            Add(items, "Strip engine code", PlayerSettings.stripEngineCode, true,
+                () => PlayerSettings.stripEngineCode = true,
+                "Removes unused engine code. Test the built game, especially features reached through reflection or plugins.");
+            Add(items, "Data caching", PlayerSettings.WebGL.dataCaching, true,
+                () => PlayerSettings.WebGL.dataCaching = true,
+                "Caches content for repeat visits. Browser storage restrictions can limit caching; check your hosting and update flow.");
+            Add(items, "Release debug symbols", PlayerSettings.WebGL.debugSymbolMode, WebGLDebugSymbolMode.Off,
+                () => PlayerSettings.WebGL.debugSymbolMode = WebGLDebugSymbolMode.Off,
+                "Disables exported debug symbols for release builds. Keep symbols enabled when diagnosing problems.");
+            var stripping = PlayerSettings.GetManagedStrippingLevel(NamedBuildTarget.WebGL);
+            Add(items, "Managed code stripping", stripping, ManagedStrippingLevel.Medium,
+                () => PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.WebGL, ManagedStrippingLevel.Medium),
+                "Uses Medium stripping to reduce code size. Preserve reflection-dependent types with link.xml or Preserve attributes and test the build. High is also accepted.",
+                stripping == ManagedStrippingLevel.Medium || stripping == ManagedStrippingLevel.High);
+            Add(items, "IL2CPP code generation", PlayerSettings.GetIl2CppCodeGeneration(NamedBuildTarget.WebGL), Il2CppCodeGeneration.OptimizeSize,
+                () => PlayerSettings.SetIl2CppCodeGeneration(NamedBuildTarget.WebGL, Il2CppCodeGeneration.OptimizeSize),
+                "Optimizes generated code for size and build time. Measure runtime performance before keeping this setting.");
+            Add(items, "Optimize mesh data", PlayerSettings.stripUnusedMeshComponents, true,
+                () => PlayerSettings.stripUnusedMeshComponents = true,
+                "Strips unused vertex attributes. Check meshes used by shaders or materials swapped at runtime.");
+            return items;
+        }
+
+        private static void Add<T>(List<ExportRecommendation> items, string title, T current, T recommended,
+            Action fix, string explanation, bool? satisfied = null)
+        {
+            items.Add(new ExportRecommendation
+            {
+                Title = title, Current = current.ToString(), Recommended = recommended.ToString(),
+                Satisfied = satisfied ?? EqualityComparer<T>.Default.Equals(current, recommended), Fix = fix, Explanation = explanation
+            });
+        }
+
+        // Unity's PlayerSettings API reads/writes the active profile override when one exists.
+        // Its YAML must be serialized back into the profile asset before saving.
+        internal static string SettingsSource(BuildProfile profile)
+        {
+            return HasPlayerSettingsOverride(profile) ? "Active build profile override" : "Shared Player Settings";
+        }
+
+        private static bool HasPlayerSettingsOverride(BuildProfile profile)
+        {
+            if (profile == null) return false;
+            var method = typeof(BuildProfile).GetMethod("HasSerializedPlayerSettings", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (method == null) throw new InvalidOperationException("Cannot determine the active profile's Player Settings source in this Unity version.");
+            return (bool)method.Invoke(profile, null);
+        }
+
+        internal static void ApplyFix(ExportRecommendation item, string contextKey)
+        {
+            if (ActivePlatform.Current.Target != BuildTarget.WebGL || ActivePlatform.Current.Key != contextKey)
+                throw new InvalidOperationException("The active build profile changed. Review the export recommendations again.");
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating || BuildPipeline.isBuildingPlayer)
+                throw new InvalidOperationException("Wait until Unity finishes compiling, importing, or building.");
+            var profile = BuildProfile.GetActiveBuildProfile();
+            MethodInfo serialize = null;
+            if (HasPlayerSettingsOverride(profile))
+            {
+                serialize = typeof(BuildProfile).GetMethod("SerializePlayerSettings", BindingFlags.Instance | BindingFlags.NonPublic);
+                if (serialize == null) throw new InvalidOperationException("Cannot save Player Settings overrides in this Unity version.");
+                Undo.RecordObject(profile, "Optimize export: " + item.Title);
+            }
+            if (item.Satisfied) return;
+            item.Fix();
+            if (serialize != null)
+            {
+                serialize.Invoke(profile, null);
+                EditorUtility.SetDirty(profile);
+            }
+            AssetDatabase.SaveAssets();
+            if (!GetRecommendations().Single(recommendation => recommendation.Title == item.Title).Satisfied)
+                throw new InvalidOperationException("Unity did not retain the recommended value. Open Player Settings to review it.");
+        }
+
         public static void RenderGUI()
         {
-            if (typeof(PlayerSettings.WebGL).GetProperty("compressionFormat") != null)
+            var context = ActivePlatform.Current;
+            ActivePlatform.RenderContext(false);
+            if (context.Target != BuildTarget.WebGL)
             {
-                var compressionOk = PlayerSettings.WebGL.compressionFormat == WebGLCompressionFormat.Brotli;
-                Action fixCompression = () => { PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Brotli; };
-                RenderFixableItem("Brotli compression", compressionOk, fixCompression);
+                EditorGUILayout.HelpBox("These export recommendations apply to WebGL. Activate a WebGL build profile to inspect and fix its settings.", MessageType.Info);
+                return;
             }
-
-            if (typeof(PlayerSettings.WebGL).GetProperty("nameFilesAsHashes") != null)
+            string source;
+            try { source = SettingsSource(BuildProfile.GetActiveBuildProfile()); }
+            catch (Exception exception) { EditorGUILayout.HelpBox(exception.Message, MessageType.Error); return; }
+            EditorGUILayout.LabelField("Settings source: " + source, EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Review each change for your release build. Shared Player Settings also affect profiles that inherit them.", EditorStyles.wordWrappedLabel);
+            var items = GetRecommendations();
+            EditorGUILayout.LabelField($"{items.Count(item => item.Satisfied)} / {items.Count} recommendations satisfied", EditorStyles.boldLabel);
+            if (_messageContext == context.Key && !string.IsNullOrEmpty(_message))
+                EditorGUILayout.HelpBox(_message, _messageType);
+            bool busy = EditorApplication.isCompiling || EditorApplication.isUpdating || BuildPipeline.isBuildingPlayer;
+            foreach (var item in items)
             {
-                var nameAsHashesOk = PlayerSettings.WebGL.nameFilesAsHashes;
-                Action fixNameAsHashes = () => { PlayerSettings.WebGL.nameFilesAsHashes = true; };
-                RenderFixableItem("Name file as hashes", nameAsHashesOk, fixNameAsHashes);
-            }
-
-            if (typeof(PlayerSettings.WebGL).GetProperty("exceptionSupport") != null)
-            {
-                var exceptionsOk = PlayerSettings.WebGL.exceptionSupport == WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly;
-                Action fixExceptions = () => { PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly; };
-                RenderFixableItem("Exception support", exceptionsOk, fixExceptions,
-                    "The \"Fix\" button sets exception support to \"Explicitly thrown exceptions only\". You can choose \"None\" in Player Settings for better performance, but first of all read about it on our developer documentation.");
-            }
-
-            if (typeof(PlayerSettings).GetProperty("stripEngineCode") != null)
-            {
-                var stripEngineCodeOk = PlayerSettings.stripEngineCode;
-                Action fixStripEngineCode = () => { PlayerSettings.stripEngineCode = true; };
-                RenderFixableItem("Strip engine code", stripEngineCodeOk, fixStripEngineCode,
-                    "To decrease the bundle size even more, you can select Medium or High stripping from Player Settings, but first of all read about them on our developer documentation.");
-            }
-
-
-#if UNITY_2020 || UNITY_2021 || UNITY_2022 || UNITY_2023_1_OR_NEWER
-            if (UnityEngine.Rendering.GraphicsSettings.defaultRenderPipeline != null)
-            {
-                RenderInfoItem(
-                    "If you are using URP but don't use post-processing we recommend disabling them. This will reduce approximately 1mb from your final build size. Check our tips on the link below for more info."
-                );
-            }
-#endif
-
-#if UNITY_2021 || UNITY_2022 || UNITY_2023_1_OR_NEWER
-            // Unity is currently missing an API for accessing the GraphicsSettings preloaded shaders, so these need to be read from a serialized object
-            var serializedGraphicsSettings = new SerializedObject(GraphicsSettings.GetGraphicsSettings());
-            var preloadedShadersCount = serializedGraphicsSettings.FindProperty("m_PreloadedShaders").arraySize;
-            if (preloadedShadersCount > 0)
-            {
-                RenderInfoItem(
-                    "Your project is preloading " + preloadedShadersCount + " shader(s). On WebGL, preloading shaders may considerably slow down the loading of the game.");
-            }
-#endif
-
-
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Read more tips on our developer documentation"))
-            {
-                Application.OpenURL("https://docs.crazygames.com/sdk/unity/resources/export-tips/");
-            }
-
-            GUILayout.FlexibleSpace();
-            EditorGUILayout.EndHorizontal();
-        }
-
-
-        /// <summary>
-        /// Render OK/FAIL, option name, and "Fix" button.
-        /// </summary>
-        /// <param name="optionName"></param>
-        /// <param name="ok">If the export option has the correct value</param>
-        /// <param name="fixAction">Is called when the fix button is clicked.</param>
-        /// <param name="additionalInfo">If specified, some additional info is displayed below label name</param>
-        private static void RenderFixableItem(string optionName, bool ok, Action fixAction, string additionalInfo = null)
-        {
-            var okStyle = new GUIStyle
-            {
-                fontStyle = FontStyle.Bold,
-                normal =
-                {
-                    textColor = Color.green
-                }
-            };
-
-            var failStyle = new GUIStyle
-            {
-                fontStyle = FontStyle.Bold,
-                normal =
-                {
-                    textColor = Color.red
-                }
-            };
-
-            var labelStyle = new GUIStyle
-            {
-                normal =
-                {
-                    textColor = EditorStyles.label.normal.textColor
-                }
-            };
-            var additionalInfoStyle = new GUIStyle
-            {
-                fontSize = 11,
-                wordWrap = true,
-                normal =
-                {
-                    textColor = EditorStyles.label.normal.textColor
-                }
-            };
-
-            EditorGUILayout.BeginVertical();
-            GUILayout.Space(10);
-
-            EditorGUILayout.BeginHorizontal();
-
-            if (ok)
-                GUILayout.Label("OK", okStyle, GUILayout.Width(35));
-            else
-                GUILayout.Label("FAIL", failStyle, GUILayout.Width(35));
-            GUILayout.Label(optionName, labelStyle);
-            GUILayout.FlexibleSpace();
-
-            if (!ok && GUILayout.Button("Fix"))
-            {
-                fixAction();
-            }
-
-            EditorGUILayout.EndHorizontal();
-
-            if (!string.IsNullOrEmpty(additionalInfo))
-            {
-                GUILayout.Space(5);
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 EditorGUILayout.BeginHorizontal();
-                GUILayout.Space(35);
-                GUILayout.Label(additionalInfo, additionalInfoStyle);
+                EditorGUILayout.LabelField((item.Satisfied ? "OK: " : "Review: ") + item.Title, EditorStyles.boldLabel);
+                using (new EditorGUI.DisabledScope(busy || item.Satisfied))
+                    if (GUILayout.Button("Fix: " + item.Title, GUILayout.Width(220)))
+                    {
+                        _messageContext = context.Key;
+                        try
+                        {
+                            ApplyFix(item, context.Key);
+                            _message = item.Title + " saved. Export recommendations have been refreshed.";
+                            _messageType = MessageType.Info;
+                        }
+                        catch (Exception exception)
+                        {
+                            _message = "Could not apply " + item.Title + ": " + exception.Message;
+                            _messageType = MessageType.Error;
+                            Debug.LogException(exception);
+                        }
+                        OptimizerWindow.EditorWindowInstance?.Repaint();
+                        // End this layout normally; the next repaint reads all settings again.
+                    }
                 EditorGUILayout.EndHorizontal();
+                EditorGUILayout.LabelField($"Current: {item.Current}    Recommended: {item.Recommended}", EditorStyles.wordWrappedLabel);
+                EditorGUILayout.LabelField(item.Explanation, EditorStyles.wordWrappedLabel);
+                EditorGUILayout.EndVertical();
             }
-
-            GUILayout.Space(10);
-            EditorGUILayout.EndVertical();
-        }
-
-        private static void RenderInfoItem(string info)
-        {
-            var infoStyle = new GUIStyle
-            {
-                fontStyle = FontStyle.Bold,
-                normal =
+            var graphicsSettings = GraphicsSettings.GetGraphicsSettings();
+            if (graphicsSettings != null)
+                using (var serialized = new SerializedObject(graphicsSettings))
                 {
-                    textColor = new Color(0.1618f, 0.5568f, 1)
+                    var preloaded = serialized.FindProperty("m_PreloadedShaders");
+                    if (preloaded != null && preloaded.arraySize > 0)
+                        EditorGUILayout.HelpBox($"Shared Graphics Settings preloads {preloaded.arraySize} shader collection(s). Review startup cost before keeping or removing these collections.", MessageType.Info);
                 }
-            };
-            var labelStyle = new GUIStyle
-            {
-                wordWrap = true,
-                normal =
-                {
-                    textColor = EditorStyles.label.normal.textColor,
-                }
-            };
-
-            EditorGUILayout.BeginVertical();
-            GUILayout.Space(10);
-
-            EditorGUILayout.BeginHorizontal();
-
-            GUILayout.Label("INFO", infoStyle, GUILayout.Width(35));
-
-            GUILayout.Label(info, labelStyle);
-            GUILayout.FlexibleSpace();
-
-
-            EditorGUILayout.EndHorizontal();
-
-
-            GUILayout.Space(10);
-            EditorGUILayout.EndVertical();
+            EditorGUILayout.HelpBox("Review preloaded shaders and unused render pipeline features in Graphics Settings. Their value depends on the game, so inspect them before removing anything.", MessageType.Info);
+            if (GUILayout.Button("Open Graphics Settings")) SettingsService.OpenProjectSettings("Project/Graphics");
+            if (GUILayout.Button("Read Unity Web optimization guidance"))
+                Application.OpenURL("https://docs.unity3d.com/6000.3/Documentation/Manual/web-optimization-player.html");
         }
     }
 }

@@ -19,6 +19,8 @@ Once you have imported the package from GitHub, or our SDK which also contains t
 
 The export optimizations tab contains a checklist of options that should be correctly set to improve the performance and decrease the bundle size of your WebGL game.
 
+Activate a WebGL build profile to use the export checklist. Each recommendation shows its current value, proposed value, tradeoffs, and an individual **Fix** button. Alongside Brotli, hashed filenames, exceptions, and engine stripping, it checks data caching, release debug symbols, managed stripping, IL2CPP code size, and unused mesh data. Changes save and the checklist refreshes immediately. The tab identifies shared Player Settings or the active profile's override; shared settings also affect profiles that inherit them. Review compatibility and test a release build after changing stripping or mesh settings.
+
 ![Export optimizations](Docs/export.png?raw=true "Export optimizations")
 
 ## Texture optimizations

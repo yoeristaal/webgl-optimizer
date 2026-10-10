@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.0] - 2026-10-11
+
+### Added
+- Export fixes for data caching, release debug symbols, Medium managed code stripping, IL2CPP code size, and unused mesh data.
+- Current/recommended values, tradeoff explanations, and a satisfaction summary for the export checklist.
+
+### Fixed
+- Export fixes require an active WebGL profile, show whether Player Settings are shared or overridden, save changes, and immediately recheck recommendations.
+- Existing High stripping and disabled exception support are accepted without downgrading them.
+
 ## [2.3.0] - 2026-10-11
 
 ### Added
