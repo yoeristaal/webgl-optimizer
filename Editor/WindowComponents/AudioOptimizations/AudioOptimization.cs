@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text.RegularExpressions;
 using CrazyGames.TreeLib;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
@@ -14,7 +12,7 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
         private static MultiColumnHeaderState _multiColumnHeaderState;
         private static AudioTree _audioCompressionTree;
 
-        private static bool _isAnalyzing;
+        private static readonly AnalysisJob _analysis = new AnalysisJob();
         private static bool _includeFilesFromPackages;
 
         public static void RenderGUI()
@@ -36,18 +34,23 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
             EditorGUILayout.Space(5);
             EditorGUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button(_isAnalyzing ? "Analyzing..." : "Analyze audio", GUILayout.Width(200)))
+            if (GUILayout.Button(_analysis.IsRunning ? "Cancel analysis" : "Analyze audio", GUILayout.Width(200)))
             {
-                AnalyzeAudio();
+                if (_analysis.IsRunning)
+                    _analysis.Cancel();
+                else
+                    AnalyzeAudio();
             }
 
             var originalValue = EditorGUIUtility.labelWidth;
             EditorGUIUtility.labelWidth = 160;
-            _includeFilesFromPackages = EditorGUILayout.Toggle("Include files from Packages", _includeFilesFromPackages);
+            using (new EditorGUI.DisabledScope(_analysis.IsRunning))
+                _includeFilesFromPackages = EditorGUILayout.Toggle("Include files from Packages", _includeFilesFromPackages);
             EditorGUIUtility.labelWidth = originalValue;
             GUILayout.FlexibleSpace();
 
             EditorGUILayout.EndHorizontal();
+            _analysis.RenderStatus();
             EditorGUILayout.Space(5);
 
             GUILayout.Label(
@@ -73,106 +76,39 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
         }
 
 
-        /**
-         * Find recursively the audio clips on which this scene depends.
-         */
-        static List<string> GetSceneAudioDependencies(string scenePath)
-        {
-            var audioDependencies = new List<string>();
-            var assetDependencies = AssetDatabase.GetDependencies(scenePath, true);
-            foreach (var assetDependency in assetDependencies)
-            {
-                if (AssetDatabase.GetMainAssetTypeAtPath(assetDependency) == typeof(AudioClip))
-                {
-                    audioDependencies.Add(assetDependency);
-                }
-            }
-
-            return audioDependencies;
-        }
-
-        static List<string> GetUsedAudioInBuildScenes()
-        {
-            var usedAudioPaths = new HashSet<string>();
-
-            var scenesInBuild = OptimizerUtils.GetScenesInBuildPath();
-            foreach (var scenePath in scenesInBuild)
-            {
-                var audioUsedInScene = GetSceneAudioDependencies(scenePath);
-                foreach (var audioPath in audioUsedInScene)
-                {
-                    usedAudioPaths.Add(audioPath);
-                }
-            }
-
-            return usedAudioPaths.ToList();
-        }
-
-        /**
-         * Get the list of audio clips in the Resources folders, or on which assets from the Resources folder depend.
-         */
-        static List<string> GetUsedAudioInResources()
-        {
-            var usedAudioPaths = new HashSet<string>();
-            var allAssetPaths = AssetDatabase.FindAssets("", new[] { "Assets" }).Select(AssetDatabase.GUIDToAssetPath).ToList();
-
-            // keep only the assets inside a Resources folder, that is not inside an Editor folder
-            var rx = new Regex(@"\w*(?<!Editor\/)Resources\/", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-            allAssetPaths = allAssetPaths.Where(assetPath => (rx.IsMatch(assetPath))).ToList();
-
-            // find all the audio clips on which the assets from the Resources folder depend
-            foreach (var assetPath in allAssetPaths)
-            {
-                var assetDependencies = AssetDatabase.GetDependencies(assetPath, true);
-                foreach (var assetDependency in assetDependencies)
-                {
-                    if (AssetDatabase.GetMainAssetTypeAtPath(assetDependency) == typeof(AudioClip))
-                    {
-                        usedAudioPaths.Add(assetDependency);
-                    }
-                }
-            }
-
-            return usedAudioPaths.ToList();
-        }
+        internal static void CancelAnalysis() => _analysis.Cancel();
 
         static void AnalyzeAudio()
         {
-            _isAnalyzing = true;
-            if (OptimizerWindow.EditorWindowInstance != null)
-            {
-                OptimizerWindow.EditorWindowInstance.Repaint();
-            }
+            bool includePackages = _includeFilesFromPackages;
+            _analysis.Start(() => AnalyzeAudioSteps(includePackages));
+        }
 
-            var usedAudioPaths = new HashSet<string>();
-
-            GetUsedAudioInBuildScenes().ForEach(path => usedAudioPaths.Add(path));
-            GetUsedAudioInResources().ForEach(path => usedAudioPaths.Add(path));
+        static IEnumerator<string> AnalyzeAudioSteps(bool includePackages)
+        {
+            var paths = new HashSet<string>();
+            foreach (string progress in AssetAnalysis.CollectPaths(path => AssetDatabase.GetMainAssetTypeAtPath(path) == typeof(AudioClip), paths, _analysis))
+                yield return progress;
 
             var treeElements = new List<AudioTreeItem>();
-            var idIncrement = 0;
-            var root = new AudioTreeItem("Root", -1, idIncrement, null, null);
-            treeElements.Add(root);
-
-            foreach (var audioPath in usedAudioPaths)
+            treeElements.Add(new AudioTreeItem("Root", -1, 0, null, null));
+            int idIncrement = 0;
+            foreach (string audioPath in paths)
             {
-                if (audioPath.StartsWith("Packages/") && !_includeFilesFromPackages)
-                {
+                yield return "Analyzing: " + audioPath;
+                if (audioPath.StartsWith("Packages/", StringComparison.Ordinal) && !includePackages)
                     continue;
-                }
-
-                idIncrement++;
                 try
                 {
-                    var audioImporter = (AudioImporter)AssetImporter.GetAtPath(audioPath);
-                    treeElements.Add(new AudioTreeItem("AudioClip", 0, idIncrement, audioPath, audioImporter));
+                    var importer = AssetImporter.GetAtPath(audioPath) as AudioImporter;
+                    if (importer == null)
+                        throw new InvalidOperationException("Asset has no compatible importer.");
+                    treeElements.Add(new AudioTreeItem("AudioClip", 0, ++idIncrement, audioPath, importer));
                 }
-                catch (Exception)
-                {
-                    Debug.LogWarning("Failed to analyze audio clip at path: " + audioPath);
-                }
+                catch (Exception exception) { _analysis.ReportSkipped(audioPath, exception); }
             }
 
+            yield return "Building results table...";
             var treeModel = new TreeModel<AudioTreeItem>(treeElements);
             var treeViewState = new TreeViewState<int>();
             if (_multiColumnHeaderState == null)
@@ -186,7 +122,7 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
                     new MultiColumnHeaderState.Column() { headerContent = new GUIContent() { text = "Quality" }, width = 60, minWidth = 60, canSort = true },
                 });
             _audioCompressionTree = new AudioTree(treeViewState, new MultiColumnHeader(_multiColumnHeaderState), treeModel);
-            _isAnalyzing = false;
+
             if (OptimizerWindow.EditorWindowInstance != null)
             {
                 OptimizerWindow.EditorWindowInstance.Repaint();

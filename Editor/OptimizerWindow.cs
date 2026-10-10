@@ -23,6 +23,11 @@ namespace CrazyGames
             EditorWindowInstance.minSize = new Vector2(800, 600);
         }
 
+        private void OnEnable()
+        {
+            EditorWindowInstance = this;
+        }
+
         void OnGUI()
         {
             EditorGUILayout.BeginVertical(EditorStyles.inspectorDefaultMargins);
@@ -89,6 +94,11 @@ namespace CrazyGames
 
         private void OnDestroy()
         {
+            TextureOptimization.CancelAnalysis();
+            ModelOptimization.CancelAnalysis();
+            AudioOptimization.CancelAnalysis();
+            BuildProfileOptimization.CancelAnalysis();
+            BuildLogs.CancelAnalysis();
             EditorWindowInstance = null;
         }
     }

@@ -1,8 +1,6 @@
 using CrazyGames.TreeLib;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
@@ -14,7 +12,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
         private static MultiColumnHeaderState _multiColumnHeaderState;
         private static ModelTree _modelTree;
 
-        private static bool _isAnalyzing;
+        private static readonly AnalysisJob _analysis = new AnalysisJob();
         private static bool _includeFilesFromPackages;
 
         private static readonly List<string> _modelFormats = new List<string>() { ".fbx", ".dae", ".3ds", ".dxf", ".obj" };
@@ -39,18 +37,23 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
             EditorGUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
 
-            if (GUILayout.Button(_isAnalyzing ? "Analyzing..." : "Analyze models", GUILayout.Width(200)))
+            if (GUILayout.Button(_analysis.IsRunning ? "Cancel analysis" : "Analyze models", GUILayout.Width(200)))
             {
-                AnalyzeModels();
+                if (_analysis.IsRunning)
+                    _analysis.Cancel();
+                else
+                    AnalyzeModels();
             }
 
             var originalValue = EditorGUIUtility.labelWidth;
             EditorGUIUtility.labelWidth = 160;
-            _includeFilesFromPackages = EditorGUILayout.Toggle("Include files from Packages", _includeFilesFromPackages);
+            using (new EditorGUI.DisabledScope(_analysis.IsRunning))
+                _includeFilesFromPackages = EditorGUILayout.Toggle("Include files from Packages", _includeFilesFromPackages);
             EditorGUIUtility.labelWidth = originalValue;
             GUILayout.FlexibleSpace();
 
             EditorGUILayout.EndHorizontal();
+            _analysis.RenderStatus();
             EditorGUILayout.Space(5);
 
             GUILayout.Label(
@@ -78,118 +81,45 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
             EditorGUILayout.EndHorizontal();
         }
 
-        /**
-         * Find recursively the models on which this scene depends.
-         */
-        static List<string> GetSceneModelDependencies(string scenePath)
-        {
-            var modelDependencies = new List<string>();
-            var assetDependencies = AssetDatabase.GetDependencies(scenePath, true);
-
-            foreach (var assetDependency in assetDependencies)
-            {
-                if (IsModelAtPath(assetDependency))
-                {
-                    modelDependencies.Add(assetDependency);
-                }
-            }
-
-            return modelDependencies;
-        }
-
-        static List<string> GetUsedModelsInBuildScenes()
-        {
-            var usedModelPaths = new HashSet<string>();
-            var scenesInBuild = OptimizerUtils.GetScenesInBuildPath();
-
-            foreach (var scenePath in scenesInBuild)
-            {
-                var modelsUsedInScene = GetSceneModelDependencies(scenePath);
-
-                foreach (var modelPath in modelsUsedInScene)
-                {
-                    usedModelPaths.Add(modelPath);
-                }
-            }
-
-            return usedModelPaths.ToList();
-        }
-
-        /**
-         * Get the list of models in the Resources folders, or on which assets from the Resources folder depend.
-         */
-        static List<string> GetUsedModelsInResources()
-        {
-            var usedModelPaths = new HashSet<string>();
-            var allAssetPaths = AssetDatabase.FindAssets("", new[] { "Assets" }).Select(AssetDatabase.GUIDToAssetPath).ToList();
-
-            // keep only the assets inside a Resources folder, that is not inside an Editor folder
-            var rx = new Regex(@"\w*(?<!Editor\/)Resources\/", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-            allAssetPaths = allAssetPaths.Where(assetPath => (rx.IsMatch(assetPath))).ToList();
-
-            // find all the models on which the assets from the Resources folder depend
-            foreach (var assetPath in allAssetPaths)
-            {
-                var assetDependencies = AssetDatabase.GetDependencies(assetPath, true);
-
-                foreach (var assetDependency in assetDependencies)
-                {
-                    if (IsModelAtPath(assetDependency))
-                    {
-                        string ext = System.IO.Path.GetExtension(assetDependency);
-                        usedModelPaths.Add(assetDependency);
-                    }
-                }
-            }
-
-            return usedModelPaths.ToList();
-        }
-
         static bool IsModelAtPath(string assetDependency)
         {
             return AssetDatabase.GetMainAssetTypeAtPath(assetDependency) == typeof(GameObject) &&
                    _modelFormats.Contains(System.IO.Path.GetExtension(assetDependency).ToLowerInvariant());
         }
 
+        internal static void CancelAnalysis() => _analysis.Cancel();
+
         static void AnalyzeModels()
         {
-            _isAnalyzing = true;
+            bool includePackages = _includeFilesFromPackages;
+            _analysis.Start(() => AnalyzeModelsSteps(includePackages));
+        }
 
-            if (OptimizerWindow.EditorWindowInstance != null)
-            {
-                OptimizerWindow.EditorWindowInstance.Repaint();
-            }
-
-            var usedModelPaths = new HashSet<string>();
-
-            GetUsedModelsInBuildScenes().ForEach(path => usedModelPaths.Add(path));
-            GetUsedModelsInResources().ForEach(path => usedModelPaths.Add(path));
+        static IEnumerator<string> AnalyzeModelsSteps(bool includePackages)
+        {
+            var paths = new HashSet<string>();
+            foreach (string progress in AssetAnalysis.CollectPaths(path => IsModelAtPath(path), paths, _analysis))
+                yield return progress;
 
             var treeElements = new List<ModelTreeItem>();
-            var idIncrement = 0;
-            var root = new ModelTreeItem("Root", -1, idIncrement, null, null);
-            treeElements.Add(root);
-
-            foreach (var modelPath in usedModelPaths)
+            treeElements.Add(new ModelTreeItem("Root", -1, 0, null, null));
+            int idIncrement = 0;
+            foreach (string modelPath in paths)
             {
-                if (modelPath.StartsWith("Packages/") && !_includeFilesFromPackages)
-                {
+                yield return "Analyzing: " + modelPath;
+                if (modelPath.StartsWith("Packages/", StringComparison.Ordinal) && !includePackages)
                     continue;
-                }
-
-                idIncrement++;
-
                 try
                 {
-                    var modelImporter = (ModelImporter)AssetImporter.GetAtPath(modelPath);
-                    treeElements.Add(new ModelTreeItem("Model", 0, idIncrement, modelPath, modelImporter));
+                    var importer = AssetImporter.GetAtPath(modelPath) as ModelImporter;
+                    if (importer == null)
+                        throw new InvalidOperationException("Asset has no compatible importer.");
+                    treeElements.Add(new ModelTreeItem("Model", 0, ++idIncrement, modelPath, importer));
                 }
-                catch (Exception)
-                {
-                    Debug.LogWarning("Failed to analyze model at path: " + modelPath);
-                }
+                catch (Exception exception) { _analysis.ReportSkipped(modelPath, exception); }
             }
 
+            yield return "Building results table...";
             var treeModel = new TreeModel<ModelTreeItem>(treeElements);
             var treeViewState = new TreeViewState<int>();
 
@@ -211,7 +141,6 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
                 });
 
             _modelTree = new ModelTree(treeViewState, new MultiColumnHeader(_multiColumnHeaderState), treeModel);
-            _isAnalyzing = false;
 
             if (OptimizerWindow.EditorWindowInstance != null)
             {

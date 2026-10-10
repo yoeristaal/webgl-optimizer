@@ -128,7 +128,11 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
         protected override void SelectionChanged(IList<int> selectedIds)
         {
             base.SelectionChanged(selectedIds);
-            var item = treeModel.Find(selectedIds.First());
+            if (selectedIds == null || selectedIds.Count == 0)
+                return;
+            var item = treeModel.Find(selectedIds[0]);
+            if (item == null)
+                return;
             Selection.activeObject = AssetDatabase.LoadMainAssetAtPath(item.filePath);
         }
     }

@@ -3,14 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using CrazyGames;
 using CrazyGames.TreeLib;
-using CrazyGames.WindowComponents.TextureOptimizations;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
-using Debug = UnityEngine.Debug;
 
 namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
 {
@@ -18,8 +15,8 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
     {
         private static MultiColumnHeaderState _multiColumnHeaderState;
         private static BuildLogTree _buildLogTree;
-        private static bool _isAnalyzing;
-        private static string _errorMessage;
+        private static readonly AnalysisJob _analysis = new AnalysisJob();
+
         private static bool _includeFilesFromPackages;
 
         public static void RenderGUI()
@@ -41,35 +38,29 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
             EditorGUILayout.Space(5);
 
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button(_isAnalyzing ? "Analyzing..." : "Analyze build logs", GUILayout.Width(200)))
+            if (GUILayout.Button(_analysis.IsRunning ? "Cancel analysis" : "Analyze build logs", GUILayout.Width(200)))
             {
-                AnalyzeBuildLogs();
+                if (_analysis.IsRunning)
+                    _analysis.Cancel();
+                else
+                    AnalyzeBuildLogs();
             }
 
             var originalValue = EditorGUIUtility.labelWidth;
             EditorGUIUtility.labelWidth = 160;
-            _includeFilesFromPackages = EditorGUILayout.Toggle("Include files from Packages", _includeFilesFromPackages);
+            using (new EditorGUI.DisabledScope(_analysis.IsRunning))
+                _includeFilesFromPackages = EditorGUILayout.Toggle("Include files from Packages", _includeFilesFromPackages);
             EditorGUIUtility.labelWidth = originalValue;
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("Open Editor.log", GUILayout.Width(200)))
             {
-                var processName = Application.platform == RuntimePlatform.OSXEditor ? "open" : "notepad.exe";
+                var processName = Application.platform == RuntimePlatform.OSXEditor ? "open" : Application.platform == RuntimePlatform.LinuxEditor ? "xdg-open" : "notepad.exe";
                 Process.Start(processName, GetEditorLogPath());
             }
 
             EditorGUILayout.EndHorizontal();
 
-            if (!string.IsNullOrEmpty(_errorMessage))
-            {
-                GUILayout.Label(_errorMessage, new GUIStyle
-                {
-                    wordWrap = true,
-                    normal =
-                    {
-                        textColor = Color.red
-                    }
-                });
-            }
+            _analysis.RenderStatus();
 
             EditorGUILayout.Space(5);
 
@@ -78,107 +69,78 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
                 EditorStyles.wordWrappedLabel);
         }
 
-        private static string GetEditorLogPath()
-        {
-            string path;
-            if (Application.platform == RuntimePlatform.OSXEditor)
-            {
-                var personalPath = Environment.GetFolderPath(Environment.SpecialFolder.Personal);
-                path = $"{personalPath}/Library/Logs/Unity/Editor.log";
-            }
-            else
-            {
-                var localAppDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                path = $@"{localAppDataPath}\Unity\Editor\Editor.log";
-            }
-            return path;
-        }
+        private static string GetEditorLogPath() => Application.consoleLogPath;
 
-        /**
-         * Return the contents of the Editor.log file.
-         */
-        private static string GetEditorLog()
-        {
-            var localAppDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            var originalEditorLogPath = GetEditorLogPath();
-            var tempEditorLogPath = $@"{localAppDataPath}\Unity\Editor\EditorCrazyGamesTemp.log";
-            // original file is blocked, perhaps by Unity editor. Need to copy it and read from the copied file.
-            File.Copy(originalEditorLogPath, tempEditorLogPath, true);
-            var editorLogStr = File.ReadAllText(tempEditorLogPath);
-            File.Delete(tempEditorLogPath);
-            return editorLogStr;
-        }
+        internal static void CancelAnalysis() => _analysis.Cancel();
 
         static void AnalyzeBuildLogs()
         {
-            _isAnalyzing = true;
-            _errorMessage = "";
-            if (OptimizerWindow.EditorWindowInstance != null)
+            bool includePackages = _includeFilesFromPackages;
+            _analysis.Start(() => AnalyzeBuildLogsSteps(includePackages));
+        }
+
+        static IEnumerator<string> AnalyzeBuildLogsSteps(bool includePackages)
+        {
+            yield return "Reading the latest build report...";
+            var reportLines = new List<string>();
+            bool readingReport = false;
+            bool readingAssets = false;
+            bool complete = false;
+            long lineNumber = 0;
+            // Stream the log rather than copying and loading the entire file. Iterator
+            // disposal closes the stream on cancellation, failure, and assembly reload.
+            using (var stream = new FileStream(GetEditorLogPath(), FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete))
+            using (var reader = new StreamReader(stream))
             {
-                OptimizerWindow.EditorWindowInstance.Repaint();
-            }
-
-            string editorLogStr;
-            try
-            {
-                editorLogStr = GetEditorLog();
-            }
-            catch (Exception e)
-            {
-                _errorMessage = "Failed to read Editor.log file, check console for more details.";
-                Debug.LogError(e);
-                return;
-            }
-
-            var buildReportStr = editorLogStr
-                .Split(new[] {$"----------------------{Environment.NewLine}Build Report{Environment.NewLine}"}, StringSplitOptions.None).Last();
-            if (!buildReportStr.StartsWith("Uncompressed usage by category"))
-            {
-                _errorMessage =
-                    "Failed to find Build Report in the Editor.log file. Please be sure the project was recently built on this machine. If the error persists, feel free to contact us.";
-                return;
-            }
-
-            // clear the lines until we reach the lines with files and the memory they occupy
-            var buildReportLines = buildReportStr.Split(new[] {Environment.NewLine}, StringSplitOptions.RemoveEmptyEntries).ToList();
-            while (!buildReportLines[0].StartsWith("Used Assets and files from the Resources folder"))
-            {
-                buildReportLines.RemoveAt(0);
-            }
-
-            buildReportLines.RemoveAt(0);
-
-
-            // start building the tree with the lines with files from the report
-            var treeElements = new List<BuildLogTreeItem>();
-            var idIncrement = 0;
-            var root = new BuildLogTreeItem("Root", -1, idIncrement, 0, "", 0, "");
-            treeElements.Add(root);
-
-            while (!buildReportLines[0].StartsWith("------------"))
-            {
-                var line = buildReportLines[0];
-                buildReportLines.RemoveAt(0);
-                // the line has the following format " 0.1 kb	 0.0% Packages/com.unity.timeline/Runtime/Animation/ICurvesOwner.cs"
-
-                idIncrement++;
-                var splitLine = line.Replace("\t", " ").Split(new[] {" "}, StringSplitOptions.RemoveEmptyEntries);
-                var size = float.Parse(splitLine[0], CultureInfo.InvariantCulture.NumberFormat);
-                var sizeUnit = splitLine[1];
-                var sizePercentage = float.Parse(splitLine[2].Replace("%", ""), CultureInfo.InvariantCulture.NumberFormat);
-                
-                // split the original line by percentage ("1.2%"), last part is the path of the asset
-                var path = line.Split(new[] {splitLine[2]}, StringSplitOptions.None).Last().Trim();
-
-                if (path.StartsWith("Packages/") && !_includeFilesFromPackages)
+                string line;
+                while ((line = reader.ReadLine()) != null)
                 {
-                    continue;
+                    yield return $"Reading Editor.log: line {++lineNumber}";
+                    string trimmed = line.Trim();
+                    if (trimmed == "Build Report" || trimmed.StartsWith("Uncompressed usage by category", StringComparison.Ordinal))
+                    {
+                        reportLines.Clear();
+                        readingReport = true;
+                        readingAssets = false;
+                        complete = false;
+                    }
+                    else if (readingReport && trimmed.StartsWith("Used Assets and files from the Resources folder", StringComparison.Ordinal))
+                    {
+                        readingAssets = true;
+                    }
+                    else if (readingAssets && trimmed.StartsWith("------------", StringComparison.Ordinal))
+                    {
+                        readingAssets = false;
+                        readingReport = false;
+                        complete = true;
+                    }
+                    else if (readingAssets && trimmed.Length > 0)
+                    {
+                        reportLines.Add(trimmed);
+                    }
                 }
+            }
+            if (!complete)
+                throw new InvalidDataException("No complete asset report was found in Editor.log. Build the project and try again");
 
-                treeElements.Add(new BuildLogTreeItem("BuildLogLine", 0, idIncrement, size, sizeUnit, sizePercentage, path));
+            var treeElements = new List<BuildLogTreeItem>();
+            treeElements.Add(new BuildLogTreeItem("Root", -1, 0, 0, "", 0, ""));
+            int idIncrement = 0;
+            foreach (string line in reportLines)
+            {
+                yield return $"Parsing build assets: {++idIncrement}/{reportLines.Count}";
+                try
+                {
+                    var entry = ParseAssetLine(line, idIncrement);
+                    if (entry.filePath.StartsWith("Packages/", StringComparison.Ordinal) && !includePackages)
+                        continue;
+                    treeElements.Add(entry);
+                }
+                catch (Exception exception) { _analysis.ReportSkipped(line, exception); }
             }
 
-
+            yield return "Building results table...";
             var treeModel = new TreeModel<BuildLogTreeItem>(treeElements);
             var treeViewState = new TreeViewState<int>();
             _multiColumnHeaderState = _multiColumnHeaderState ?? new MultiColumnHeaderState(new[]
@@ -189,11 +151,30 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
                 new MultiColumnHeaderState.Column() {headerContent = new GUIContent() {text = "Path"}, width = 300, minWidth = 200, canSort = true},
             });
             _buildLogTree = new BuildLogTree(treeViewState, new MultiColumnHeader(_multiColumnHeaderState), treeModel);
-            _isAnalyzing = false;
+
             if (OptimizerWindow.EditorWindowInstance != null)
             {
                 OptimizerWindow.EditorWindowInstance.Repaint();
             }
+        }
+        internal static BuildLogTreeItem ParseAssetLine(string line, int id)
+        {
+            var parts = line.Split(new[] { ' ', '\t' }, 4, StringSplitOptions.RemoveEmptyEntries);
+            float size;
+            float percentage;
+            if (parts.Length != 4 || !parts[2].EndsWith("%", StringComparison.Ordinal) ||
+                !float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out size) ||
+                !float.TryParse(parts[2].TrimEnd('%'), NumberStyles.Float, CultureInfo.InvariantCulture, out percentage) ||
+                float.IsNaN(size) || float.IsInfinity(size) || size < 0 ||
+                float.IsNaN(percentage) || float.IsInfinity(percentage) || percentage < 0 || percentage > 100)
+                throw new FormatException("Invalid asset size or percentage");
+            string unit = parts[1].ToLowerInvariant();
+            if (unit != "b" && unit != "kb" && unit != "mb" && unit != "gb")
+                throw new FormatException("Unsupported size unit: " + parts[1]);
+            string path = parts[3].Trim();
+            if (path.Length == 0)
+                throw new FormatException("Missing asset path");
+            return new BuildLogTreeItem("BuildLogLine", 0, id, size, unit, percentage, path);
         }
     }
 }

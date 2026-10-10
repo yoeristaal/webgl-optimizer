@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text.RegularExpressions;
 using CrazyGames.TreeLib;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
@@ -14,7 +12,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
         private static MultiColumnHeaderState _multiColumnHeaderState;
         private static TextureTree _textureCompressionTree;
 
-        private static bool _isAnalyzing;
+        private static readonly AnalysisJob _analysis = new AnalysisJob();
         private static bool _includeFilesFromPackages;
 
         public static void RenderGUI()
@@ -36,18 +34,23 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             EditorGUILayout.Space(5);
             EditorGUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button(_isAnalyzing ? "Analyzing..." : "Analyze textures", GUILayout.Width(200)))
+            if (GUILayout.Button(_analysis.IsRunning ? "Cancel analysis" : "Analyze textures", GUILayout.Width(200)))
             {
-                AnalyzeTextures();
+                if (_analysis.IsRunning)
+                    _analysis.Cancel();
+                else
+                    AnalyzeTextures();
             }
 
             var originalValue = EditorGUIUtility.labelWidth;
             EditorGUIUtility.labelWidth = 160;
-            _includeFilesFromPackages = EditorGUILayout.Toggle("Include files from Packages", _includeFilesFromPackages);
+            using (new EditorGUI.DisabledScope(_analysis.IsRunning))
+                _includeFilesFromPackages = EditorGUILayout.Toggle("Include files from Packages", _includeFilesFromPackages);
             EditorGUIUtility.labelWidth = originalValue;
             GUILayout.FlexibleSpace();
 
             EditorGUILayout.EndHorizontal();
+            _analysis.RenderStatus();
             EditorGUILayout.Space(5);
 
             GUILayout.Label(
@@ -75,115 +78,39 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             EditorGUILayout.EndHorizontal();
         }
 
-        /**
-         * Find recursively the textures on which this scene depends.
-         */
-        static List<string> GetSceneTextureDependencies(string scenePath)
-        {
-            var textureDependencies = new List<string>();
-            var assetDependencies = AssetDatabase.GetDependencies(scenePath, true);
-            foreach (var assetDependency in assetDependencies)
-            {
-                if (AssetDatabase.GetMainAssetTypeAtPath(assetDependency) == typeof(Texture2D))
-                {
-                    textureDependencies.Add(assetDependency);
-                }
-            }
-
-            return textureDependencies;
-        }
-
-        static List<string> GetUsedTexturesInBuildScenes()
-        {
-            var usedTexturePaths = new HashSet<string>();
-
-            var scenesInBuild = OptimizerUtils.GetScenesInBuildPath();
-            foreach (var scenePath in scenesInBuild)
-            {
-                var texturesUsedInScene = GetSceneTextureDependencies(scenePath);
-                foreach (var texturePath in texturesUsedInScene)
-                {
-                    usedTexturePaths.Add(texturePath);
-                }
-            }
-
-            return usedTexturePaths.ToList();
-        }
-
-        /**
-         * Get the list of textures in the Resources folders, or on which assets from the Resources folder depend.
-         */
-        static List<string> GetUsedTexturesInResources()
-        {
-            var usedTexturePaths = new HashSet<string>();
-            var allAssetPaths = AssetDatabase.FindAssets("", new[] { "Assets" }).Select(AssetDatabase.GUIDToAssetPath).ToList();
-
-            // keep only the assets inside a Resources folder, that is not inside an Editor folder
-            var rx = new Regex(@"\w*(?<!Editor\/)Resources\/", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-            allAssetPaths = allAssetPaths.Where(assetPath => (rx.IsMatch(assetPath))).ToList();
-
-            // find all the textures on which the assets from the Resources folder depend
-            foreach (var assetPath in allAssetPaths)
-            {
-                var assetDependencies = AssetDatabase.GetDependencies(assetPath, true);
-                foreach (var assetDependency in assetDependencies)
-                {
-                    if (AssetDatabase.GetMainAssetTypeAtPath(assetDependency) == typeof(Texture2D))
-                    {
-                        usedTexturePaths.Add(assetDependency);
-                    }
-                }
-            }
-
-            return usedTexturePaths.ToList();
-        }
+        internal static void CancelAnalysis() => _analysis.Cancel();
 
         static void AnalyzeTextures()
         {
-            Debug.Log("AnalyzeTextures button clicked - Starting analysis...");
-            _isAnalyzing = true;
-            if (OptimizerWindow.EditorWindowInstance != null)
-            {
-                OptimizerWindow.EditorWindowInstance.Repaint();
-            }
+            bool includePackages = _includeFilesFromPackages;
+            _analysis.Start(() => AnalyzeTexturesSteps(includePackages));
+        }
 
-            var usedTexturePaths = new HashSet<string>();
-
-            GetUsedTexturesInBuildScenes().ForEach(path => usedTexturePaths.Add(path));
-            GetUsedTexturesInResources().ForEach(path => usedTexturePaths.Add(path));
-
-            Debug.Log($"Found {usedTexturePaths.Count} unique textures in build scenes and resources");
+        static IEnumerator<string> AnalyzeTexturesSteps(bool includePackages)
+        {
+            var paths = new HashSet<string>();
+            foreach (string progress in AssetAnalysis.CollectPaths(path => AssetDatabase.GetMainAssetTypeAtPath(path) == typeof(Texture2D), paths, _analysis))
+                yield return progress;
 
             var treeElements = new List<TextureTreeItem>();
-            var idIncrement = 0;
-            var root = new TextureTreeItem("Root", -1, idIncrement, null, null);
-            treeElements.Add(root);
-
-            Debug.Log($"Processing {usedTexturePaths.Count} texture paths...");
-
-            foreach (var texturePath in usedTexturePaths)
+            treeElements.Add(new TextureTreeItem("Root", -1, 0, null, null));
+            int idIncrement = 0;
+            foreach (string texturePath in paths)
             {
-                if (texturePath.StartsWith("Packages/") && !_includeFilesFromPackages)
-                {
-                    Debug.Log($"Skipping package texture: {texturePath}");
+                yield return "Analyzing: " + texturePath;
+                if (texturePath.StartsWith("Packages/", StringComparison.Ordinal) && !includePackages)
                     continue;
-                }
-
-                idIncrement++;
                 try
                 {
-                    var textureImporter = (TextureImporter)AssetImporter.GetAtPath(texturePath);
-                    treeElements.Add(new TextureTreeItem("Texture2D", 0, idIncrement, texturePath, textureImporter));
-                    Debug.Log($"Added texture: {texturePath}");
+                    var importer = AssetImporter.GetAtPath(texturePath) as TextureImporter;
+                    if (importer == null)
+                        throw new InvalidOperationException("Asset has no compatible importer.");
+                    treeElements.Add(new TextureTreeItem("Texture2D", 0, ++idIncrement, texturePath, importer));
                 }
-                catch (Exception e)
-                {
-                    Debug.LogWarning($"Failed to analyze texture at path: {texturePath}. Error: {e.Message}");
-                }
+                catch (Exception exception) { _analysis.ReportSkipped(texturePath, exception); }
             }
 
-            Debug.Log($"Created tree with {treeElements.Count} elements (including root)");
-
+            yield return "Building results table...";
             var treeModel = new TreeModel<TextureTreeItem>(treeElements);
             var treeViewState = new TreeViewState<int>();
             if (_multiColumnHeaderState == null)
@@ -202,8 +129,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                         {headerContent = new GUIContent() {text = "Override for WebGL"}, width = 120, minWidth = 120, canSort = true},
                 });
             _textureCompressionTree = new TextureTree(treeViewState, new MultiColumnHeader(_multiColumnHeaderState), treeModel);
-            _isAnalyzing = false;
-            Debug.Log("Analysis complete!");
+
             if (OptimizerWindow.EditorWindowInstance != null)
             {
                 OptimizerWindow.EditorWindowInstance.Repaint();

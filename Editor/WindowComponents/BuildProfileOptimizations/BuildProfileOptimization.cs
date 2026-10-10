@@ -14,7 +14,7 @@ namespace CrazyGames.WindowComponents.BuildProfileOptimizations
         private static MultiColumnHeaderState _multiColumnHeaderState;
         private static BuildProfileTree _buildProfileTree;
 
-        private static bool _isAnalyzing;
+        private static readonly AnalysisJob _analysis = new AnalysisJob();
 
         public static void RenderGUI()
         {
@@ -35,13 +35,17 @@ namespace CrazyGames.WindowComponents.BuildProfileOptimizations
             EditorGUILayout.Space(5);
             EditorGUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button(_isAnalyzing ? "Analyzing..." : "Analyze build profiles", GUILayout.Width(200)))
+            if (GUILayout.Button(_analysis.IsRunning ? "Cancel analysis" : "Analyze build profiles", GUILayout.Width(200)))
             {
-                AnalyzeBuildProfiles();
+                if (_analysis.IsRunning)
+                    _analysis.Cancel();
+                else
+                    AnalyzeBuildProfiles();
             }
             GUILayout.FlexibleSpace();
 
             EditorGUILayout.EndHorizontal();
+            _analysis.RenderStatus();
             EditorGUILayout.Space(5);
 
             GUILayout.Label(
@@ -66,46 +70,35 @@ namespace CrazyGames.WindowComponents.BuildProfileOptimizations
             EditorGUILayout.EndHorizontal();
         }
 
-        static void AnalyzeBuildProfiles()
+        internal static void CancelAnalysis() => _analysis.Cancel();
+
+        static void AnalyzeBuildProfiles() => _analysis.Start(AnalyzeBuildProfilesSteps);
+
+        static IEnumerator<string> AnalyzeBuildProfilesSteps()
         {
-            Debug.Log("AnalyzeBuildProfiles button clicked - Starting analysis...");
-
-            _isAnalyzing = true;
-            if (OptimizerWindow.EditorWindowInstance != null)
-            {
-                OptimizerWindow.EditorWindowInstance.Repaint();
-            }
-
             var treeElements = new List<BuildProfileTreeItem>();
             var idIncrement = 0;
             var root = new BuildProfileTreeItem("Root", -1, idIncrement, null);
             treeElements.Add(root);
 
-            try
+            yield return "Finding build profiles...";
+            var profileGuids = AssetDatabase.FindAssets("t:BuildProfile");
+            foreach (var guid in profileGuids)
             {
-                // Get all build profiles in the project
-                var profileGuids = AssetDatabase.FindAssets("t:BuildProfile");
-                Debug.Log($"Found {profileGuids.Length} build profiles in project");
-
-                foreach (var guid in profileGuids)
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                yield return "Analyzing profile: " + path;
+                try
                 {
                     idIncrement++;
-                    var path = AssetDatabase.GUIDToAssetPath(guid);
                     var profile = AssetDatabase.LoadAssetAtPath<BuildProfile>(path);
-
-                    if (profile != null)
-                    {
-                        treeElements.Add(new BuildProfileTreeItem("BuildProfile", 0, idIncrement, profile));
-                        Debug.Log($"Added build profile: {profile.name}");
-                    }
+                    if (profile == null)
+                        throw new InvalidOperationException("Build profile could not be loaded.");
+                    treeElements.Add(new BuildProfileTreeItem("BuildProfile", 0, idIncrement, profile));
                 }
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"Failed to analyze build profiles. Error: {e.Message}");
+                catch (Exception exception) { _analysis.ReportSkipped(path, exception); }
             }
 
-            Debug.Log($"Created tree with {treeElements.Count} elements (including root)");
+            yield return "Building results table...";
 
             var treeModel = new TreeModel<BuildProfileTreeItem>(treeElements);
             var treeViewState = new TreeViewState<int>();
@@ -122,9 +115,6 @@ namespace CrazyGames.WindowComponents.BuildProfileOptimizations
                 });
 
             _buildProfileTree = new BuildProfileTree(treeViewState, new MultiColumnHeader(_multiColumnHeaderState), treeModel);
-            _isAnalyzing = false;
-
-            Debug.Log("Analysis complete!");
 
             if (OptimizerWindow.EditorWindowInstance != null)
             {

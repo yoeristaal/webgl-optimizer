@@ -18,10 +18,14 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
             {
                 switch (sizeUnit)
                 {
+                    case "b":
+                        return size;
                     case "kb":
                         return size * 1024;
                     case "mb":
                         return size * 1024 * 1024;
+                    case "gb":
+                        return size * 1024 * 1024 * 1024;
                     default:
                         throw new Exception("Unknown size unit " + sizeUnit);
                 }
