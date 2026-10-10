@@ -13,6 +13,8 @@ Minimum required versions:
 
 Once you have imported the package from GitHub, or our SDK which also contains this tool, it will be accessible in the `Tools > WebGL Optimizer` menu option.
 
+Analysis tabs automatically run once when first opened after an editor reload. Use their **Analyze** buttons for manual refreshes or retries; opening a tab again keeps its existing results.
+
 ![Menu option](Docs/menu-option.png?raw=true)
 
 ## Export optimizations
@@ -48,7 +50,9 @@ Recommendations appear as a summary grouped by fix type, such as compression, ma
 
 For a smaller batch, select assets in the table and click **Preview fixes for selected assets**. **View affected files** opens an optional detail view with individual checks and **Preview this fix** buttons. Changes are grouped by asset so each asset is reimported once. Texture and audio fixes create or update the active platform override; model fixes affect every platform. Switching profiles clears previews and prevents applying stale recommendations. Package assets and assets that are not editable are excluded from fixes. Asset analysis and recommendations refresh automatically after a batch or restore finishes.
 
-**Restore last batch** restores saved importer settings. It skips assets whose settings have since changed, preserving newer edits. Restore history is kept in `Library/WebGLOptimizer/ImporterHistory.json` and survives editor reloads; deleting the Library folder deletes that history. Cancelling a batch stops remaining work, and completed changes remain restorable. Individual Unity reimports finish before cancellation takes effect.
+**Restore last batch** restores saved importer settings. It skips assets whose settings have since changed, preserving newer edits. Restore history is kept in `Library/WebGLOptimizer/ImporterHistory.json` and survives editor reloads; deleting the Library folder deletes that history. Cancelling a batch stops remaining work, and completed changes remain restorable.
+
+Batch execution and restoration group imports in chunks of 32 assets, with restore-history writes per chunk. Cancellation takes effect between chunks after Unity finishes the current import phase. Texture conversion and compression still take time; the optimizer reduces repeated import setup and history-file writes rather than skipping that processing.
 
 ## Model optimizations
 

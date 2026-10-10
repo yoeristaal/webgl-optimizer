@@ -30,7 +30,13 @@ namespace CrazyGames
 
         public string Capture() => EditorJsonUtility.ToJson(_importer);
         public void Restore(string settings) => EditorJsonUtility.FromJsonOverwrite(settings, _importer);
-        public void Reimport() => _importer.SaveAndReimport();
+        public void Reimport()
+        {
+            EditorUtility.SetDirty(_importer);
+            AssetDatabase.WriteImportSettingsIfDirty(_importer.assetPath);
+            // ImportAsset is queued while OptimizationBatch holds an editing scope.
+            AssetDatabase.ImportAsset(_importer.assetPath);
+        }
 
         public OptimizationFacts GetFacts(OptimizationAssetKind kind)
         {

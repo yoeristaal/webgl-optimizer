@@ -18,16 +18,18 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
         private static readonly AnalysisJob _analysis = new AnalysisJob();
 
         private static bool _includeFilesFromPackages;
+        private static bool _hasAnalyzed;
 
         public static void RenderGUI()
         {
+            if (!_hasAnalyzed) AnalyzeBuildLogs();
             var rect = EditorGUILayout.BeginVertical(GUILayout.MinHeight(300));
             GUILayout.FlexibleSpace();
             EditorGUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
             EditorGUILayout.BeginVertical();
-            GUILayout.Label("Press \"Analyze build logs\" button, but be sure the project was built at least once on this machine.");
-            GUILayout.Label("Press it again when you need to refresh the data.");
+            GUILayout.Label("Build logs are analyzed automatically when this tab first opens. Build the project at least once on this machine.");
+            GUILayout.Label("Use Analyze build logs to refresh the data.");
             EditorGUILayout.EndVertical();
             GUILayout.FlexibleSpace();
             EditorGUILayout.EndHorizontal();
@@ -75,6 +77,7 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
 
         static void AnalyzeBuildLogs()
         {
+            _hasAnalyzed = true;
             bool includePackages = _includeFilesFromPackages;
             _analysis.Start(() => AnalyzeBuildLogsSteps(includePackages));
         }

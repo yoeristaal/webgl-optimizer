@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.4.2] - 2026-10-11
+
+### Changed
+- Texture, model, audio, build profile, and build log tabs automatically start analysis on their first opening.
+- Manual refresh and cancellation remain available. Repaints and revisiting a tab do not restart analysis; failed or cancelled initial runs require a manual retry.
+
+## [2.4.1] - 2026-10-11
+
+### Fixed
+- Batch fixes and restores group imports in chunks of 32 assets instead of triggering a separate import cycle for each asset.
+- Restore history is saved a few times per chunk rather than rewritten for every asset; backups remain durable before imports start.
+- Import scopes always close before yielding, including on failure, so cancellation between chunks cannot leave Unity importing paused.
+- Post-import checks reacquire importer objects and retain backups when an import flush fails.
+
 ## [2.4.0] - 2026-10-11
 
 ### Added

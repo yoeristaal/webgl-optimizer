@@ -15,6 +15,7 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
         private static readonly AnalysisJob _analysis = new AnalysisJob();
         private static readonly RecommendationPanel _recommendations = new RecommendationPanel(OptimizationAssetKind.Audio);
         private static bool _includeFilesFromPackages;
+        private static bool _hasAnalyzed;
         private static string _contextKey;
         private static int _settingsRevision = -1;
 
@@ -29,6 +30,7 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
                 _audioCompressionTree = null;
                 if (hadResults) AnalyzeAudio();
             }
+            if (!_hasAnalyzed) AnalyzeAudio();
             if (_settingsRevision != ActivePlatform.Revision)
             {
                 _settingsRevision = ActivePlatform.Revision;
@@ -40,8 +42,8 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
             EditorGUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
             EditorGUILayout.BeginVertical();
-            GUILayout.Label("Press \"Analyze audio\" button to load the table.");
-            GUILayout.Label("Press it again when you need to refresh the data.");
+            GUILayout.Label("Audio clips are analyzed automatically when this tab first opens.");
+            GUILayout.Label("Use Analyze audio to refresh the data.");
             EditorGUILayout.EndVertical();
             GUILayout.FlexibleSpace();
             EditorGUILayout.EndHorizontal();
@@ -104,6 +106,7 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
 
         static void AnalyzeAudio()
         {
+            _hasAnalyzed = true;
             bool includePackages = _includeFilesFromPackages;
             string contextKey = ActivePlatform.Current.Key;
             _analysis.Start(() => AnalyzeAudioSteps(includePackages, contextKey));

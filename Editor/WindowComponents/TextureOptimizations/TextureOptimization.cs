@@ -15,6 +15,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
         private static readonly AnalysisJob _analysis = new AnalysisJob();
         private static readonly RecommendationPanel _recommendations = new RecommendationPanel(OptimizationAssetKind.Texture);
         private static bool _includeFilesFromPackages;
+        private static bool _hasAnalyzed;
         private static string _contextKey;
         private static int _settingsRevision = -1;
 
@@ -29,6 +30,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                 _textureCompressionTree = null;
                 if (hadResults) AnalyzeTextures();
             }
+            if (!_hasAnalyzed) AnalyzeTextures();
             if (_settingsRevision != ActivePlatform.Revision)
             {
                 _settingsRevision = ActivePlatform.Revision;
@@ -40,8 +42,8 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             EditorGUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
             EditorGUILayout.BeginVertical();
-            GUILayout.Label("Press \"Analyze textures\" button to load the table.");
-            GUILayout.Label("Press it again when you need to refresh the data.");
+            GUILayout.Label("Textures are analyzed automatically when this tab first opens.");
+            GUILayout.Label("Use Analyze textures to refresh the data.");
             EditorGUILayout.EndVertical();
             GUILayout.FlexibleSpace();
             EditorGUILayout.EndHorizontal();
@@ -106,6 +108,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
 
         static void AnalyzeTextures()
         {
+            _hasAnalyzed = true;
             bool includePackages = _includeFilesFromPackages;
             string contextKey = ActivePlatform.Current.Key;
             _analysis.Start(() => AnalyzeTexturesSteps(includePackages, contextKey));

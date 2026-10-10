@@ -15,6 +15,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
         private static readonly AnalysisJob _analysis = new AnalysisJob();
         private static readonly RecommendationPanel _recommendations = new RecommendationPanel(OptimizationAssetKind.Model);
         private static bool _includeFilesFromPackages;
+        private static bool _hasAnalyzed;
         private static string _contextKey;
 
         private static readonly List<string> _modelFormats = new List<string>() { ".fbx", ".dae", ".3ds", ".dxf", ".obj" };
@@ -30,6 +31,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
                 _modelTree = null;
                 if (hadResults) AnalyzeModels();
             }
+            if (!_hasAnalyzed) AnalyzeModels();
             ActivePlatform.RenderContext(false);
             EditorGUILayout.LabelField("Model import settings apply to all platforms.", EditorStyles.wordWrappedLabel);
             var rect = EditorGUILayout.BeginVertical(GUILayout.MinHeight(300));
@@ -37,8 +39,8 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
             EditorGUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
             EditorGUILayout.BeginVertical();
-            GUILayout.Label("Press \"Analyze models\" button to load the table.");
-            GUILayout.Label("Press it again when you need to refresh the data.");
+            GUILayout.Label("Models are analyzed automatically when this tab first opens.");
+            GUILayout.Label("Use Analyze models to refresh the data.");
             EditorGUILayout.EndVertical();
             GUILayout.FlexibleSpace();
             EditorGUILayout.EndHorizontal();
@@ -109,6 +111,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
 
         static void AnalyzeModels()
         {
+            _hasAnalyzed = true;
             bool includePackages = _includeFilesFromPackages;
             string contextKey = ActivePlatform.Current.Key;
             _analysis.Start(() => AnalyzeModelsSteps(includePackages, contextKey));

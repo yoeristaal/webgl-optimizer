@@ -15,16 +15,18 @@ namespace CrazyGames.WindowComponents.BuildProfileOptimizations
         private static BuildProfileTree _buildProfileTree;
 
         private static readonly AnalysisJob _analysis = new AnalysisJob();
+        private static bool _hasAnalyzed;
 
         public static void RenderGUI()
         {
+            if (!_hasAnalyzed) AnalyzeBuildProfiles();
             var rect = EditorGUILayout.BeginVertical(GUILayout.MinHeight(300));
             GUILayout.FlexibleSpace();
             EditorGUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
             EditorGUILayout.BeginVertical();
-            GUILayout.Label("Press \"Analyze build profiles\" button to load the table.");
-            GUILayout.Label("Press it again when you need to refresh the data.");
+            GUILayout.Label("Build profiles are analyzed automatically when this tab first opens.");
+            GUILayout.Label("Use Analyze build profiles to refresh the data.");
             EditorGUILayout.EndVertical();
             GUILayout.FlexibleSpace();
             EditorGUILayout.EndHorizontal();
@@ -72,7 +74,11 @@ namespace CrazyGames.WindowComponents.BuildProfileOptimizations
 
         internal static void CancelAnalysis() => _analysis.Cancel();
 
-        static void AnalyzeBuildProfiles() => _analysis.Start(AnalyzeBuildProfilesSteps);
+        static void AnalyzeBuildProfiles()
+        {
+            _hasAnalyzed = true;
+            _analysis.Start(AnalyzeBuildProfilesSteps);
+        }
 
         static IEnumerator<string> AnalyzeBuildProfilesSteps()
         {
