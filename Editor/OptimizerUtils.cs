@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEditor;
+using UnityEditor.Build.Profile;
 
 namespace CrazyGames
 {
@@ -11,7 +12,9 @@ namespace CrazyGames
         public static List<string> GetScenesInBuildPath()
         {
             var scenesInBuild = new List<string>();
-            foreach (var scene in EditorBuildSettings.scenes)
+            var profile = BuildProfile.GetActiveBuildProfile();
+            var scenes = profile == null ? EditorBuildSettings.scenes : profile.GetScenesForBuild();
+            foreach (var scene in scenes)
             {
                 if (scene.enabled)
                 {

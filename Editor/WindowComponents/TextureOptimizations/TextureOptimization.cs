@@ -15,9 +15,26 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
         private static readonly AnalysisJob _analysis = new AnalysisJob();
         private static readonly RecommendationPanel _recommendations = new RecommendationPanel(OptimizationAssetKind.Texture);
         private static bool _includeFilesFromPackages;
+        private static string _contextKey;
+        private static int _settingsRevision = -1;
 
         public static void RenderGUI()
         {
+            var context = ActivePlatform.Current;
+            if (_contextKey != context.Key)
+            {
+                bool hadResults = _textureCompressionTree != null || _analysis.IsRunning;
+                _contextKey = context.Key;
+                CancelAnalysis();
+                _textureCompressionTree = null;
+                if (hadResults) AnalyzeTextures();
+            }
+            if (_settingsRevision != ActivePlatform.Revision)
+            {
+                _settingsRevision = ActivePlatform.Revision;
+                _textureCompressionTree?.Reload();
+            }
+            ActivePlatform.RenderContext();
             var rect = EditorGUILayout.BeginVertical(GUILayout.MinHeight(300));
             GUILayout.FlexibleSpace();
             EditorGUILayout.BeginHorizontal();
@@ -66,7 +83,8 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             BuildExplanation("Crunch compression",
                 "All the textures with crunch compression enabled will be compressed together, decreasing the final build size.");
             BuildExplanation("Crunch comp. quality", "A higher compression quality means larger textures and longer compression times.");
-            BuildExplanation("Override for WebGL", "When enabled, allows platform-specific settings for WebGL builds.");
+            BuildExplanation("Settings source", "Default means no active platform override is enabled. Otherwise, the table shows that platform's override. Desktop overrides are shared by Windows, macOS and Linux.");
+            BuildExplanation("Format", "An explicit format controls texture compression; the Compression and Crunch fields are used with Automatic formats where supported.");
         }
 
         static void BuildExplanation(string label, string explanation)
@@ -89,10 +107,11 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
         static void AnalyzeTextures()
         {
             bool includePackages = _includeFilesFromPackages;
-            _analysis.Start(() => AnalyzeTexturesSteps(includePackages));
+            string contextKey = ActivePlatform.Current.Key;
+            _analysis.Start(() => AnalyzeTexturesSteps(includePackages, contextKey));
         }
 
-        static IEnumerator<string> AnalyzeTexturesSteps(bool includePackages)
+        static IEnumerator<string> AnalyzeTexturesSteps(bool includePackages, string contextKey)
         {
             var paths = new HashSet<string>();
             foreach (string progress in AssetAnalysis.CollectPaths(path => AssetDatabase.GetMainAssetTypeAtPath(path) == typeof(Texture2D), paths, _analysis))
@@ -117,6 +136,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             }
 
             yield return "Building results table...";
+            if (contextKey != ActivePlatform.Current.Key) yield break;
             var treeModel = new TreeModel<TextureTreeItem>(treeElements);
             var treeViewState = new TreeViewState<int>();
             if (_multiColumnHeaderState == null)
@@ -132,7 +152,9 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                     new MultiColumnHeaderState.Column()
                         {headerContent = new GUIContent() {text = "Crunch comp. quality"}, width = 128, minWidth = 128, canSort = true},
                     new MultiColumnHeaderState.Column()
-                        {headerContent = new GUIContent() {text = "Override for WebGL"}, width = 120, minWidth = 120, canSort = true},
+                        {headerContent = new GUIContent() {text = "Settings source"}, width = 130, minWidth = 130, canSort = true},
+                    new MultiColumnHeaderState.Column()
+                        {headerContent = new GUIContent() {text = "Format"}, width = 110, minWidth = 110, canSort = true},
                 });
             _textureCompressionTree = new TextureTree(treeViewState, new MultiColumnHeader(_multiColumnHeaderState), treeModel);
 

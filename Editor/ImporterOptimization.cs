@@ -9,10 +9,16 @@ namespace CrazyGames
     internal sealed class ImporterOptimization : IOptimizationImporter
     {
         private readonly AssetImporter _importer;
+        private readonly string _platform;
+        private readonly string _contextKey;
         public string Guid => AssetDatabase.AssetPathToGUID(_importer.assetPath);
+        public string ContextKey => ActivePlatform.Current.Key;
 
-        public ImporterOptimization(string path)
+        public ImporterOptimization(string path, string platform = null, string contextKey = null)
         {
+            var context = ActivePlatform.Current;
+            _platform = platform ?? context.ImporterPlatform;
+            _contextKey = contextKey ?? context.Key;
             if (string.IsNullOrEmpty(path) || !path.StartsWith("Assets/", StringComparison.Ordinal) ||
                 !AssetDatabase.IsOpenForEdit(path, StatusQueryOptions.ForceUpdate) ||
                 !AssetDatabase.IsOpenForEdit(path + ".meta", StatusQueryOptions.ForceUpdate))
@@ -28,10 +34,16 @@ namespace CrazyGames
 
         public OptimizationFacts GetFacts(OptimizationAssetKind kind)
         {
-            var facts = new OptimizationFacts { Path = _importer.assetPath, Kind = kind };
+            if (ContextKey != _contextKey)
+                throw new InvalidOperationException("Active build profile changed. Refresh recommendations.");
+            var facts = new OptimizationFacts
+            {
+                Path = _importer.assetPath, Kind = kind, PlatformName = ActivePlatform.Current.DisplayName,
+                ContextKey = _contextKey
+            };
             if (kind == OptimizationAssetKind.Texture && _importer is TextureImporter texture)
             {
-                var settings = EffectiveTextureSettings(texture);
+                var settings = EffectiveTextureSettings(texture, _platform);
                 facts.UncompressedTexture = settings.textureCompression == TextureImporterCompression.Uncompressed;
                 facts.AutomaticTextureFormat = settings.format == TextureImporterFormat.Automatic;
                 facts.TextureMaxSize = settings.maxTextureSize;
@@ -45,7 +57,7 @@ namespace CrazyGames
             }
             else if (kind == OptimizationAssetKind.Audio && _importer is AudioImporter audio)
             {
-                var settings = EffectiveAudioSettings(audio);
+                var settings = EffectiveAudioSettings(audio, _platform);
                 facts.VorbisAudio = settings.compressionFormat == AudioCompressionFormat.Vorbis;
                 facts.AudioQuality = settings.quality;
             }
@@ -54,28 +66,34 @@ namespace CrazyGames
             return facts;
         }
 
-        internal static TextureImporterPlatformSettings EffectiveTextureSettings(TextureImporter importer)
+        internal static TextureImporterPlatformSettings EffectiveTextureSettings(TextureImporter importer, string platform)
         {
-            var settings = importer.GetPlatformTextureSettings("WebGL");
+            if (string.IsNullOrEmpty(platform)) return importer.GetDefaultPlatformTextureSettings();
+            var settings = importer.GetPlatformTextureSettings(platform);
             return settings.overridden ? settings : importer.GetDefaultPlatformTextureSettings();
         }
 
-        internal static AudioImporterSampleSettings EffectiveAudioSettings(AudioImporter importer)
+        internal static AudioImporterSampleSettings EffectiveAudioSettings(AudioImporter importer, string platform)
         {
-            return importer.ContainsSampleSettingsOverride("WebGL") ?
-                importer.GetOverrideSampleSettings("WebGL") : importer.defaultSampleSettings;
+            return !string.IsNullOrEmpty(platform) && importer.ContainsSampleSettingsOverride(platform) ?
+                importer.GetOverrideSampleSettings(platform) : importer.defaultSampleSettings;
         }
 
         public void Apply(OptimizationRule rule)
         {
+            if (ContextKey != _contextKey)
+                throw new InvalidOperationException("The active build profile changed. Refresh recommendations before applying fixes");
+            if (string.IsNullOrEmpty(_platform) && (rule == OptimizationRule.TextureCompression ||
+                rule == OptimizationRule.TextureMaxSize || rule == OptimizationRule.AudioQuality))
+                throw new InvalidOperationException("The active platform does not support importer overrides");
             switch (rule)
             {
                 case OptimizationRule.TextureCompression:
                 case OptimizationRule.TextureMaxSize:
                     var texture = _importer as TextureImporter;
                     if (texture == null) throw new InvalidOperationException("Texture importer is missing");
-                    var textureSettings = EffectiveTextureSettings(texture);
-                    textureSettings.name = "WebGL";
+                    var textureSettings = EffectiveTextureSettings(texture, _platform);
+                    textureSettings.name = _platform;
                     textureSettings.overridden = true;
                     if (rule == OptimizationRule.TextureCompression)
                     {
@@ -90,12 +108,12 @@ namespace CrazyGames
                 case OptimizationRule.AudioQuality:
                     var audio = _importer as AudioImporter;
                     if (audio == null) throw new InvalidOperationException("Audio importer is missing");
-                    var audioSettings = EffectiveAudioSettings(audio);
+                    var audioSettings = EffectiveAudioSettings(audio, _platform);
                     if (audioSettings.compressionFormat != AudioCompressionFormat.Vorbis)
                         throw new InvalidOperationException("Quality fixes require Vorbis compression");
                     audioSettings.quality = Math.Min(audioSettings.quality, 0.7f);
-                    if (!audio.SetOverrideSampleSettings("WebGL", audioSettings))
-                        throw new InvalidOperationException("Unity could not set the WebGL audio override");
+                    if (!audio.SetOverrideSampleSettings(_platform, audioSettings))
+                        throw new InvalidOperationException("Unity could not set the active platform audio override");
                     break;
                 default:
                     var model = _importer as ModelImporter;

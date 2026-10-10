@@ -15,9 +15,26 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
         private static readonly AnalysisJob _analysis = new AnalysisJob();
         private static readonly RecommendationPanel _recommendations = new RecommendationPanel(OptimizationAssetKind.Audio);
         private static bool _includeFilesFromPackages;
+        private static string _contextKey;
+        private static int _settingsRevision = -1;
 
         public static void RenderGUI()
         {
+            var context = ActivePlatform.Current;
+            if (_contextKey != context.Key)
+            {
+                bool hadResults = _audioCompressionTree != null || _analysis.IsRunning;
+                _contextKey = context.Key;
+                CancelAnalysis();
+                _audioCompressionTree = null;
+                if (hadResults) AnalyzeAudio();
+            }
+            if (_settingsRevision != ActivePlatform.Revision)
+            {
+                _settingsRevision = ActivePlatform.Revision;
+                _audioCompressionTree?.Reload();
+            }
+            ActivePlatform.RenderContext();
             var rect = EditorGUILayout.BeginVertical(GUILayout.MinHeight(300));
             GUILayout.FlexibleSpace();
             EditorGUILayout.BeginHorizontal();
@@ -64,6 +81,7 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
                 "The default option, Decompress On Load, is good for audio clips that require precision when played, for example, audio effects or dialogues. For background audio clips Compressed In Memory is recommended, since it reduces the runtime memory, though audio playback is less precise and may introduce latency.");
             BuildExplanation("Quality",
                 "Lowering the quality will reduce the build size. You can experiment with a lower audio quality for background audio.");
+            BuildExplanation("Settings source", "Default means no active platform override is enabled. Otherwise, the table shows that platform's override. Desktop overrides are shared by Windows, macOS and Linux.");
         }
 
         static void BuildExplanation(string label, string explanation)
@@ -87,10 +105,11 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
         static void AnalyzeAudio()
         {
             bool includePackages = _includeFilesFromPackages;
-            _analysis.Start(() => AnalyzeAudioSteps(includePackages));
+            string contextKey = ActivePlatform.Current.Key;
+            _analysis.Start(() => AnalyzeAudioSteps(includePackages, contextKey));
         }
 
-        static IEnumerator<string> AnalyzeAudioSteps(bool includePackages)
+        static IEnumerator<string> AnalyzeAudioSteps(bool includePackages, string contextKey)
         {
             var paths = new HashSet<string>();
             foreach (string progress in AssetAnalysis.CollectPaths(path => AssetDatabase.GetMainAssetTypeAtPath(path) == typeof(AudioClip), paths, _analysis))
@@ -115,6 +134,7 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
             }
 
             yield return "Building results table...";
+            if (contextKey != ActivePlatform.Current.Key) yield break;
             var treeModel = new TreeModel<AudioTreeItem>(treeElements);
             var treeViewState = new TreeViewState<int>();
             if (_multiColumnHeaderState == null)
@@ -126,6 +146,8 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
                     new MultiColumnHeaderState.Column()
                         { headerContent = new GUIContent() { text = "Load type" }, width = 150, minWidth = 150, canSort = true },
                     new MultiColumnHeaderState.Column() { headerContent = new GUIContent() { text = "Quality" }, width = 60, minWidth = 60, canSort = true },
+                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent() { text = "Settings source" }, width = 130, minWidth = 130, canSort = true },
+                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent() { text = "Format" }, width = 90, minWidth = 90, canSort = true },
                 });
             _audioCompressionTree = new AudioTree(treeViewState, new MultiColumnHeader(_multiColumnHeaderState), treeModel);
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.2.0] - 2026-10-10
+
+### Added
+- Active build profile and platform indicators in texture, audio, and model tabs.
+- Settings source and format columns showing Default or the active platform override.
+
+### Fixed
+- Texture and audio tables and recommendations use the active platform's effective importer settings, falling back to defaults when no override is enabled.
+- Analysis uses the active build profile's scene list and refreshes when profiles change.
+- Batch fixes target the reviewed platform and reject previews after switching build profiles. Desktop overrides use Unity's shared Standalone settings.
+
 ## [2.1.0] - 2026-10-10
 
 ### Added

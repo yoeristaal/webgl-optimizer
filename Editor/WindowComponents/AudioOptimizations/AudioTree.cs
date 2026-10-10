@@ -48,6 +48,12 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
                 case 2:
                     items = items.Order(i => i.data.Quality, ascending);
                     break;
+                case 3:
+                    items = items.Order(i => i.data.SettingsSource, ascending);
+                    break;
+                case 4:
+                    items = items.Order(i => i.data.CompressionFormat, ascending);
+                    break;
             }
 
             rootItem.children = items.Cast<TreeViewItem<int>>().ToList();
@@ -121,6 +127,12 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
                     break;
                 case 2:
                     GUI.Label(cellRect, item.data.Quality.ToString());
+                    break;
+                case 3:
+                    GUI.Label(cellRect, item.data.SettingsSource);
+                    break;
+                case 4:
+                    GUI.Label(cellRect, item.data.CompressionFormat);
                     break;
             }
         }

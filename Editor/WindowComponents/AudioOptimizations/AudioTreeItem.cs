@@ -15,6 +15,7 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
         {
             get
             {
+                Refresh();
                 switch (_platformSettings.loadType)
                 {
                     case AudioClipLoadType.DecompressOnLoad:
@@ -29,10 +30,30 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
             }
         }
 
-        public int Quality => Mathf.RoundToInt(_platformSettings.quality * 100);
+        public int Quality { get { Refresh(); return Mathf.RoundToInt(_platformSettings.quality * 100); } }
+        public string SettingsSource { get { Refresh(); return _source; } }
+        public string CompressionFormat { get { Refresh(); return _platformSettings.compressionFormat.ToString(); } }
 
-        private readonly AudioImporter _audioImporter;
-        private readonly AudioImporterSampleSettings _platformSettings;
+        private AudioImporter _audioImporter;
+        private AudioImporterSampleSettings _platformSettings;
+        private string _contextKey, _source;
+        private int _revision = -1;
+        private double _nextRefresh;
+
+        private void Refresh()
+        {
+            if (AudioPath == null) return;
+            var context = ActivePlatform.Current;
+            if (_contextKey == context.Key && _revision == ActivePlatform.Revision && EditorApplication.timeSinceStartup < _nextRefresh) return;
+            _contextKey = context.Key;
+            _revision = ActivePlatform.Revision;
+            _nextRefresh = EditorApplication.timeSinceStartup + 0.25;
+            _audioImporter = AssetImporter.GetAtPath(AudioPath) as AudioImporter;
+            if (_audioImporter == null) { _source = "Unavailable"; _platformSettings = default; return; }
+            _platformSettings = ImporterOptimization.EffectiveAudioSettings(_audioImporter, context.ImporterPlatform);
+            _source = !string.IsNullOrEmpty(context.ImporterPlatform) && _audioImporter.ContainsSampleSettingsOverride(context.ImporterPlatform)
+                ? context.DisplayName + " override" : "Default";
+        }
 
         public AudioTreeItem(string name, int depth, int id, string audioPath, AudioImporter audioImporter) : base(name, depth, id)
         {
@@ -43,7 +64,7 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
             AudioName = Path.GetFileName(audioPath);
 
             _audioImporter = audioImporter;
-            _platformSettings = _audioImporter.GetOverrideSampleSettings("WebGL");
+            Refresh();
         }
     }
 }

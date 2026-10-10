@@ -23,12 +23,22 @@ namespace CrazyGames
         private object _lastTree;
         private int _page;
         private bool _refreshRequested;
+        private string _contextKey;
 
         public RecommendationPanel(OptimizationAssetKind kind) { _kind = kind; }
 
         public void Render<T>(TreeViewWithTreeModel<T> tree, Func<T, string> assetPath,
             bool analysisBusy, Action refreshTable) where T : TreeElement
         {
+            var context = ActivePlatform.Current;
+            if (_contextKey != context.Key)
+            {
+                _contextKey = context.Key;
+                _scan.Cancel();
+                _issues.Clear();
+                _preview = null;
+                _page = 0;
+            }
             if (!ReferenceEquals(_lastTree, tree))
             {
                 _lastTree = tree;
@@ -70,7 +80,7 @@ namespace CrazyGames
                     var paths = tree.treeModel.root.children == null ? new string[0] :
                         tree.treeModel.root.children.OfType<T>().Select(assetPath).Where(path => !string.IsNullOrEmpty(path)).ToArray();
                     _preview = null;
-                    _scan.Start(() => Scan(paths));
+                    _scan.Start(() => Scan(paths, context));
                 }
             }
             if (_scan.IsRunning && GUILayout.Button("Cancel recommendation scan"))
@@ -135,7 +145,7 @@ namespace CrazyGames
             else
             {
                 int assets = _preview.Select(issue => issue.Path).Distinct().Count();
-                EditorGUILayout.HelpBox($"Preview: {_preview.Length} change(s) across {assets} asset(s). Each asset will be reimported. Texture and audio changes target WebGL; model changes affect all platforms. Previous importer settings will be saved for Restore last batch.", MessageType.Info);
+                EditorGUILayout.HelpBox($"Preview: {_preview.Length} change(s) across {assets} asset(s). Each asset will be reimported. Texture and audio changes create or update the {context.DisplayName} override; model changes affect all platforms. Previous importer settings will be saved for Restore last batch.", MessageType.Info);
                 using (new EditorGUI.DisabledScope(busy || !historyReady))
                 {
                     EditorGUILayout.BeginHorizontal();
@@ -145,7 +155,7 @@ namespace CrazyGames
                         _preview = null;
                         _scan.Cancel();
                         Changes.Start(() => RunChanges(OptimizationBatch.Apply(selected,
-                            path => new ImporterOptimization(path), _history, Changes.ReportSkipped)));
+                            path => new ImporterOptimization(path, context.ImporterPlatform, context.Key), _history, Changes.ReportSkipped)));
                     }
                     if (GUILayout.Button("Back to recommendations")) _preview = null;
                     EditorGUILayout.EndHorizontal();
@@ -164,17 +174,19 @@ namespace CrazyGames
             Changes.RenderStatus();
         }
 
-        private IEnumerator<string> Scan(string[] paths)
+        private IEnumerator<string> Scan(string[] paths, PlatformContext context)
         {
             var issues = new List<OptimizationRecommendation>();
             foreach (string path in paths)
             {
                 yield return "Reviewing: " + path;
+                if (ActivePlatform.Current.Key != context.Key)
+                    throw new InvalidOperationException("Active build profile changed. Refresh recommendations.");
                 // Packages can be displayed by analysis, but are never offered for modification.
                 if (!path.StartsWith("Assets/", StringComparison.Ordinal)) continue;
                 try
                 {
-                    var importer = new ImporterOptimization(path);
+                    var importer = new ImporterOptimization(path, context.ImporterPlatform, context.Key);
                     string baseline = importer.Capture();
                     var recommendations = OptimizationRules.Evaluate(importer.GetFacts(_kind));
                     foreach (var issue in recommendations)
@@ -186,7 +198,8 @@ namespace CrazyGames
                 }
                 catch (Exception exception) { _scan.ReportSkipped(path, exception); }
             }
-            _issues = OptimizationRules.Rank(issues);
+            if (ActivePlatform.Current.Key == context.Key)
+                _issues = OptimizationRules.Rank(issues);
         }
 
         private static IEnumerator<string> RunChanges(IEnumerable<string> steps)

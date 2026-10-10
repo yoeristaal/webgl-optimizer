@@ -15,11 +15,23 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
         private static readonly AnalysisJob _analysis = new AnalysisJob();
         private static readonly RecommendationPanel _recommendations = new RecommendationPanel(OptimizationAssetKind.Model);
         private static bool _includeFilesFromPackages;
+        private static string _contextKey;
 
         private static readonly List<string> _modelFormats = new List<string>() { ".fbx", ".dae", ".3ds", ".dxf", ".obj" };
 
         public static void RenderGUI()
         {
+            var context = ActivePlatform.Current;
+            if (_contextKey != context.Key)
+            {
+                bool hadResults = _modelTree != null || _analysis.IsRunning;
+                _contextKey = context.Key;
+                CancelAnalysis();
+                _modelTree = null;
+                if (hadResults) AnalyzeModels();
+            }
+            ActivePlatform.RenderContext(false);
+            EditorGUILayout.LabelField("Model import settings apply to all platforms.", EditorStyles.wordWrappedLabel);
             var rect = EditorGUILayout.BeginVertical(GUILayout.MinHeight(300));
             GUILayout.FlexibleSpace();
             EditorGUILayout.BeginHorizontal();
@@ -98,10 +110,11 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
         static void AnalyzeModels()
         {
             bool includePackages = _includeFilesFromPackages;
-            _analysis.Start(() => AnalyzeModelsSteps(includePackages));
+            string contextKey = ActivePlatform.Current.Key;
+            _analysis.Start(() => AnalyzeModelsSteps(includePackages, contextKey));
         }
 
-        static IEnumerator<string> AnalyzeModelsSteps(bool includePackages)
+        static IEnumerator<string> AnalyzeModelsSteps(bool includePackages, string contextKey)
         {
             var paths = new HashSet<string>();
             foreach (string progress in AssetAnalysis.CollectPaths(path => IsModelAtPath(path), paths, _analysis))
@@ -126,6 +139,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
             }
 
             yield return "Building results table...";
+            if (contextKey != ActivePlatform.Current.Key) yield break;
             var treeModel = new TreeModel<ModelTreeItem>(treeElements);
             var treeViewState = new TreeViewState<int>();
 

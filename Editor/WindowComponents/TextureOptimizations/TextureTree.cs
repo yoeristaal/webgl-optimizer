@@ -60,6 +60,9 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                 case 6:
                     items = items.Order(i => i.data.OverrideStatus, ascending);
                     break;
+                case 7:
+                    items = items.Order(i => i.data.TextureFormat, ascending);
+                    break;
             }
 
             rootItem.children = items.Cast<TreeViewItem<int>>().ToList();
@@ -145,6 +148,9 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                     break;
                 case 6:
                     GUI.Label(cellRect, item.data.OverrideStatus);
+                    break;
+                case 7:
+                    GUI.Label(cellRect, item.data.TextureFormat.ToString());
                     break;
             }
         }

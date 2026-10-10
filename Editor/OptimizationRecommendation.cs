@@ -23,6 +23,7 @@ namespace CrazyGames
         public bool Selected = false;
         public string Guid;
         public string Baseline;
+        public string ContextKey;
     }
 
     internal struct OptimizationFacts
@@ -38,6 +39,8 @@ namespace CrazyGames
         public bool ModelCompressionOff;
         public bool VorbisAudio;
         public float AudioQuality;
+        public string PlatformName;
+        public string ContextKey;
     }
 
     internal static class OptimizationRules
@@ -45,16 +48,17 @@ namespace CrazyGames
         public static List<OptimizationRecommendation> Evaluate(OptimizationFacts facts)
         {
             var result = new List<OptimizationRecommendation>();
+            string platform = facts.PlatformName ?? "Active platform";
             if (facts.Kind == OptimizationAssetKind.Texture)
             {
                 if (facts.UncompressedTexture && facts.AutomaticTextureFormat)
                     Add(result, facts, OptimizationRule.TextureCompression, OptimizationSeverity.High,
-                        "Compress texture for WebGL", "WebGL compression: Uncompressed → Normal",
-                        "Compression can reduce texture memory and build size. Check gradients, UI, and transparency for artifacts. Creates a WebGL override if needed.");
+                        "Compress texture for " + platform, platform + " compression: Uncompressed → Normal",
+                        $"Compression can reduce texture memory and build size. Check gradients, UI, and transparency for artifacts. Creates a {platform} override if needed.");
                 if (facts.TextureMaxSize > 1024)
                     Add(result, facts, OptimizationRule.TextureMaxSize, OptimizationSeverity.Medium,
-                        "Review texture resolution", $"WebGL max size: {facts.TextureMaxSize} → 1024",
-                        "A lower resolution can reduce memory and build size. Check the texture at its largest on-screen size before keeping this change. Creates a WebGL override if needed.");
+                        "Review texture resolution", $"{platform} max size: {facts.TextureMaxSize} → 1024",
+                        $"A lower resolution can reduce memory and build size. Check the texture at its largest on-screen size before keeping this change. Creates a {platform} override if needed.");
             }
             else if (facts.Kind == OptimizationAssetKind.Model)
             {
@@ -77,8 +81,8 @@ namespace CrazyGames
             }
             else if (facts.VorbisAudio && facts.AudioQuality > 0.7f)
                 Add(result, facts, OptimizationRule.AudioQuality, OptimizationSeverity.Medium,
-                    "Review audio compression quality", $"WebGL Vorbis quality: {facts.AudioQuality:P0} → 70%",
-                    "Lower quality may reduce download size. Listen for artifacts, especially in dialogue and music. Creates a WebGL override if needed.");
+                    "Review audio compression quality", $"{platform} Vorbis quality: {facts.AudioQuality:P0} → 70%",
+                    $"Lower quality may reduce download size. Listen for artifacts, especially in dialogue and music. Creates a {platform} override if needed.");
             return result;
         }
 
@@ -94,7 +98,7 @@ namespace CrazyGames
             result.Add(new OptimizationRecommendation
             {
                 Path = facts.Path, Rule = rule, Severity = severity, Title = title,
-                Change = change, Explanation = explanation
+                Change = change, Explanation = explanation, ContextKey = facts.ContextKey
             });
         }
     }

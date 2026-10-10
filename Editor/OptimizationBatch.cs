@@ -17,6 +17,7 @@ namespace CrazyGames
     internal interface IOptimizationImporter
     {
         string Guid { get; }
+        string ContextKey { get; }
         string Capture();
         void Apply(OptimizationRule rule);
         void Restore(string settings);
@@ -48,8 +49,9 @@ namespace CrazyGames
                 {
                     importer = resolve(group.Key);
                     string before = importer.Capture();
-                    if (group.Any(issue => issue.Guid != importer.Guid || issue.Baseline != before))
-                        throw new InvalidOperationException("The asset or its importer settings changed after review. Refresh recommendations before applying fixes");
+                    if (group.Any(issue => issue.Guid != importer.Guid || issue.Baseline != before ||
+                        (issue.ContextKey != null && issue.ContextKey != importer.ContextKey)))
+                        throw new InvalidOperationException("The active build profile, asset, or importer settings changed after review. Refresh recommendations before applying fixes");
                     backup = new OptimizationBackup
                     {
                         Batch = batch, Guid = importer.Guid, Path = group.Key, Before = before, Expected = before
