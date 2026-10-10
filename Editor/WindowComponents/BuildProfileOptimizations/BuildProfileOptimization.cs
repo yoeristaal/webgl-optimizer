@@ -108,7 +108,7 @@ namespace CrazyGames.WindowComponents.BuildProfileOptimizations
             Debug.Log($"Created tree with {treeElements.Count} elements (including root)");
 
             var treeModel = new TreeModel<BuildProfileTreeItem>(treeElements);
-            var treeViewState = new TreeViewState();
+            var treeViewState = new TreeViewState<int>();
 
             if (_multiColumnHeaderState == null)
                 _multiColumnHeaderState = new MultiColumnHeaderState(new[]

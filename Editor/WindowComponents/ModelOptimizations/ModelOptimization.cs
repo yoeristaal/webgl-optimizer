@@ -191,7 +191,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
             }
 
             var treeModel = new TreeModel<ModelTreeItem>(treeElements);
-            var treeViewState = new TreeViewState();
+            var treeViewState = new TreeViewState<int>();
 
             if (_multiColumnHeaderState == null)
                 _multiColumnHeaderState = new MultiColumnHeaderState(new[]
