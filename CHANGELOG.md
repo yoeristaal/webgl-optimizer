@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.5.0] - 2026-10-19
+
+### Added
+- Sortable audio columns for Imported Size, Ratio, Original Size, Duration, Channels, Sample Rate, Force to Mono, Preload Audio Data, and Load in Background.
+- Audio clip asset paths on hover, column tooltips, and explanations of audio size and loading settings.
+- Project instructions requiring agents to update the changelog and increase the package version whenever they change the project.
+
+### Changed
+- Audio size and clip metadata refresh after reimports and active platform changes; unavailable data displays N/A.
+
 ## [2.4.2] - 2026-10-11
 
 ### Changed

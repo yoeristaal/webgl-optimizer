@@ -84,6 +84,10 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
             BuildExplanation("Quality",
                 "Lowering the quality will reduce the build size. You can experiment with a lower audio quality for background audio.");
             BuildExplanation("Settings source", "Default means no active platform override is enabled. Otherwise, the table shows that platform's override. Desktop overrides are shared by Windows, macOS and Linux.");
+            BuildExplanation("Imported Size", "Size of the imported audio data for the active platform, as shown in Unity's audio Inspector.");
+            BuildExplanation("Ratio", "Imported size divided by original size, shown as a percentage. Lower values mean a smaller imported file relative to the original. N/A means Unity's size data is unavailable.");
+            BuildExplanation("Clip details", "Duration, channels and sample rate describe the imported clip. Force to Mono shows the import setting. Hover over a clip name to see its asset path.");
+            BuildExplanation("Loading", "Preload Audio Data shows the active platform setting (N/A for Streaming, where it is ignored). Load in Background shows whether audio loads asynchronously. Right-click a column header to show or hide columns.");
         }
 
         static void BuildExplanation(string label, string explanation)
@@ -151,6 +155,15 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
                     new MultiColumnHeaderState.Column() { headerContent = new GUIContent() { text = "Quality" }, width = 60, minWidth = 60, canSort = true },
                     new MultiColumnHeaderState.Column() { headerContent = new GUIContent() { text = "Settings source" }, width = 130, minWidth = 130, canSort = true },
                     new MultiColumnHeaderState.Column() { headerContent = new GUIContent() { text = "Format" }, width = 90, minWidth = 90, canSort = true },
+                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Imported Size", "Imported audio data size for the active platform, matching Unity's audio Inspector."), width = 100, minWidth = 100, canSort = true },
+                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Ratio", "Imported size / original size × 100%."), width = 75, minWidth = 75, canSort = true },
+                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Original Size", "Original audio size reported by Unity's audio Inspector; the denominator used for Ratio."), width = 100, minWidth = 100, canSort = true },
+                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Duration", "Imported clip length in seconds."), width = 85, minWidth = 75, canSort = true },
+                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Channels", "Channel count of the imported clip, after Force to Mono is applied."), width = 80, minWidth = 70, canSort = true },
+                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Sample Rate", "Actual sample rate of the imported clip."), width = 100, minWidth = 90, canSort = true },
+                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Force to Mono", "Whether the importer converts the audio to a single channel."), width = 110, minWidth = 100, canSort = true },
+                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Preload Audio Data", "Whether the active platform preloads audio data. N/A for Streaming, where this setting is ignored."), width = 140, minWidth = 130, canSort = true },
+                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Load in Background", "Whether the importer enables asynchronous audio loading."), width = 145, minWidth = 135, canSort = true },
                 });
             _audioCompressionTree = new AudioTree(treeViewState, new MultiColumnHeader(_multiColumnHeaderState), treeModel);
 

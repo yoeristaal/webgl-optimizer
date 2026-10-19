@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using CrazyGames.TreeLib;
 using UnityEditor;
@@ -53,6 +54,33 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
                     break;
                 case 4:
                     items = items.Order(i => i.data.CompressionFormat, ascending);
+                    break;
+                case 5:
+                    items = items.Order(i => i.data.ImportedSize, ascending);
+                    break;
+                case 6:
+                    items = items.Order(i => i.data.Ratio, ascending);
+                    break;
+                case 7:
+                    items = items.Order(i => i.data.OriginalSize, ascending);
+                    break;
+                case 8:
+                    items = items.Order(i => i.data.Duration, ascending);
+                    break;
+                case 9:
+                    items = items.Order(i => i.data.Channels, ascending);
+                    break;
+                case 10:
+                    items = items.Order(i => i.data.SampleRate, ascending);
+                    break;
+                case 11:
+                    items = items.Order(i => i.data.ForceToMono, ascending);
+                    break;
+                case 12:
+                    items = items.Order(i => i.data.PreloadAudioData, ascending);
+                    break;
+                case 13:
+                    items = items.Order(i => i.data.LoadInBackground, ascending);
                     break;
             }
 
@@ -120,7 +148,7 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
             switch (column)
             {
                 case 0:
-                    GUI.Label(cellRect, item.data.AudioName);
+                    GUI.Label(cellRect, new GUIContent(item.data.AudioName, item.data.AudioPath));
                     break;
                 case 1:
                     GUI.Label(cellRect, item.data.LoadType);
@@ -134,8 +162,43 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
                 case 4:
                     GUI.Label(cellRect, item.data.CompressionFormat);
                     break;
+                case 5:
+                    var importedSize = item.data.ImportedSize;
+                    GUI.Label(cellRect, importedSize.HasValue ? EditorUtility.FormatBytes(importedSize.Value) : "N/A");
+                    break;
+                case 6:
+                    var ratio = item.data.Ratio;
+                    GUI.Label(cellRect, ratio.HasValue ? ratio.Value.ToString("0.00", CultureInfo.InvariantCulture) + "%" : "N/A");
+                    break;
+                case 7:
+                    var originalSize = item.data.OriginalSize;
+                    GUI.Label(cellRect, originalSize.HasValue ? EditorUtility.FormatBytes(originalSize.Value) : "N/A");
+                    break;
+                case 8:
+                    var duration = item.data.Duration;
+                    GUI.Label(cellRect, duration.HasValue ? duration.Value.ToString("0.00", CultureInfo.InvariantCulture) + " s" : "N/A");
+                    break;
+                case 9:
+                    var channels = item.data.Channels;
+                    GUI.Label(cellRect, channels == 1 ? "Mono" : channels == 2 ? "Stereo" : channels?.ToString() ?? "N/A");
+                    break;
+                case 10:
+                    var sampleRate = item.data.SampleRate;
+                    GUI.Label(cellRect, sampleRate.HasValue ? (sampleRate.Value / 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + " kHz" : "N/A");
+                    break;
+                case 11:
+                    GUI.Label(cellRect, FormatFlag(item.data.ForceToMono));
+                    break;
+                case 12:
+                    GUI.Label(cellRect, FormatFlag(item.data.PreloadAudioData));
+                    break;
+                case 13:
+                    GUI.Label(cellRect, FormatFlag(item.data.LoadInBackground));
+                    break;
             }
         }
+
+        private static string FormatFlag(bool? value) => value.HasValue ? (value.Value ? "Yes" : "No") : "N/A";
 
         protected override void SelectionChanged(IList<int> selectedIds)
         {
