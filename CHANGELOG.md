@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.6.0] - 2026-10-23
+
+### Added
+- Sortable Compressed size column in the Textures tab showing imported texture storage size for the active platform, with readable byte units and N/A for unavailable data.
+- Texture size tooltips and explanations; sizes refresh after reimports and active platform changes.
+
 ## [2.5.0] - 2026-10-19
 
 ### Added

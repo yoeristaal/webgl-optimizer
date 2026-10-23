@@ -63,6 +63,9 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                 case 7:
                     items = items.Order(i => i.data.TextureFormat, ascending);
                     break;
+                case 8:
+                    items = items.Order(i => i.data.CompressedSize, ascending);
+                    break;
             }
 
             rootItem.children = items.Cast<TreeViewItem<int>>().ToList();
@@ -151,6 +154,10 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                     break;
                 case 7:
                     GUI.Label(cellRect, item.data.TextureFormat.ToString());
+                    break;
+                case 8:
+                    var size = item.data.CompressedSize;
+                    GUI.Label(cellRect, size.HasValue ? EditorUtility.FormatBytes(size.Value) : "N/A");
                     break;
             }
         }

@@ -87,6 +87,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             BuildExplanation("Crunch comp. quality", "A higher compression quality means larger textures and longer compression times.");
             BuildExplanation("Settings source", "Default means no active platform override is enabled. Otherwise, the table shows that platform's override. Desktop overrides are shared by Windows, macOS and Linux.");
             BuildExplanation("Format", "An explicit format controls texture compression; the Compression and Crunch fields are used with Automatic formats where supported.");
+            BuildExplanation("Compressed size", "Imported texture storage size for the active platform, including mipmaps and Crunch compression where enabled. Uncompressed formats show their uncompressed storage size. Final build/download compression can change this size; unavailable data shows N/A.");
         }
 
         static void BuildExplanation(string label, string explanation)
@@ -158,6 +159,8 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                         {headerContent = new GUIContent() {text = "Settings source"}, width = 130, minWidth = 130, canSort = true},
                     new MultiColumnHeaderState.Column()
                         {headerContent = new GUIContent() {text = "Format"}, width = 110, minWidth = 110, canSort = true},
+                    new MultiColumnHeaderState.Column()
+                        {headerContent = new GUIContent("Compressed size", "Imported texture storage size for the active platform, including mipmaps and Crunch where enabled. Final build/download compression can change this size."), width = 115, minWidth = 115, canSort = true},
                 });
             _textureCompressionTree = new TextureTree(treeViewState, new MultiColumnHeader(_multiColumnHeaderState), treeModel);
 
