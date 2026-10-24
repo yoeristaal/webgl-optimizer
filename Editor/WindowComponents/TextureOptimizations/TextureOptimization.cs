@@ -88,6 +88,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             BuildExplanation("Settings source", "Default means no active platform override is enabled. Otherwise, the table shows that platform's override. Desktop overrides are shared by Windows, macOS and Linux.");
             BuildExplanation("Format", "An explicit format controls texture compression; the Compression and Crunch fields are used with Automatic formats where supported.");
             BuildExplanation("Compressed size", "Imported texture storage size for the active platform, including mipmaps and Crunch compression where enabled. Uncompressed formats show their uncompressed storage size. Final build/download compression can change this size; unavailable data shows N/A.");
+            BuildExplanation("Orange rows", "Settings worth reviewing: uncompressed automatic formats, max size above 1024, or Crunch disabled on a compatible automatic format. Hover the texture name for details.");
         }
 
         static void BuildExplanation(string label, string explanation)

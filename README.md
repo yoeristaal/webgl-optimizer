@@ -60,6 +60,14 @@ The model optimizations tool works very similar to the texture optimizations too
 
 ![Model optimizations](Docs/models.png?raw=true "Model optimizations")
 
+## Materials
+
+The Materials tab analyzes materials in the active build profile's scene and Resources dependencies, including embedded materials in models. Analysis starts on first opening and refreshes when the active profile changes. Use **Analyze materials** after edits or reimports, or toggle **Include files from Packages** to include package materials. Analysis can be cancelled while retaining previous results.
+
+Search by material name and sort by material, shader, render queue, shader passes, GPU instancing, enabled keywords, unique assigned textures, texture memory, double-sided GI, or asset path. Click a row to inspect that exact material, including model sub-assets, and double-click to ping it. Hover keyword counts for their names.
+
+Texture memory is the Editor profiler's native memory for the material's unique assigned textures, not compressed build size or a player GPU estimate. Shared textures are repeated across materials, so row sizes must not be added together. Pass and keyword counts are not draw-call or shader-variant counts. Materials loaded only through other systems, such as Addressables, may be absent.
+
 ## Audio clip optimizations
 
 The audio clip optimizations tool works very similar to the texture optimizations tool, but instead of textures it finds audio clips in your project and provides various tips about optimizing them.

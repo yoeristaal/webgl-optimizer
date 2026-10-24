@@ -120,6 +120,9 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
         {
             var item = (TreeViewItemData<TextureTreeItem>)args.item;
 
+            if (Event.current.type == EventType.Repaint && !string.IsNullOrEmpty(item.data.ReviewReason))
+                EditorGUI.DrawRect(args.rowRect, new Color(1f, 0.55f, 0.1f, args.selected ? 0.08f : 0.14f));
+
             for (int i = 0; i < args.GetNumVisibleColumns(); ++i)
             {
                 CellGUI(args.GetCellRect(i), item, args.GetColumn(i), ref args);
@@ -132,7 +135,9 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             switch (column)
             {
                 case 0:
-                    GUI.Label(cellRect, item.data.TextureName);
+                    var reason = item.data.ReviewReason;
+                    GUI.Label(cellRect, new GUIContent(item.data.TextureName,
+                        string.IsNullOrEmpty(reason) ? item.data.TexturePath : item.data.TexturePath + "\nReview settings:\n" + reason));
                     break;
                 case 1:
                     GUI.Label(cellRect, item.data.TextureType.ToString());

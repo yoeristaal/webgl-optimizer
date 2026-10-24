@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.8.0] - 2026-10-24
+
+### Added
+- Materials tab with automatic, cancellable analysis of build-scene and Resources dependencies, including embedded model materials and optional package assets.
+- Searchable, sortable material columns for shader, render queue, shader passes, GPU instancing, keywords, texture count, Editor texture memory, double-sided GI, and asset path; select materials directly in the Inspector.
+
+## [2.7.0] - 2026-10-24
+
+### Added
+- Subtle orange texture row highlights for settings flagged by the existing optimization recommendations, with hover explanations and updates when effective settings change.
+
+## [2.6.1] - 2026-10-24
+
+### Fixed
+- Fixed texture size column compilation on Unity versions where the pending texture compression flag is internal, using optional reflection access.
+
 ## [2.6.0] - 2026-10-23
 
 ### Added

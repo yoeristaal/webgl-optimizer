@@ -1,5 +1,6 @@
 ﻿using CrazyGames.WindowComponents;
 using CrazyGames.WindowComponents.ModelOptimizations;
+using CrazyGames.WindowComponents.MaterialOptimizations;
 using CrazyGames.WindowComponents.TextureOptimizations;
 using CrazyGames.WindowComponents.BuildProfileOptimizations;
 using CrazyOptimizer.Editor.WindowComponents.BuildLogs;
@@ -14,7 +15,7 @@ namespace CrazyGames
     {
         private int _toolbarInt = 0;
         private Vector2 _scrollPosition;
-        private readonly string[] _toolbarStrings = { "Export", "Textures", "Models", "Build Profiles", "Audio clips", "Build logs", "About" };
+        private readonly string[] _toolbarStrings = { "Export", "Textures", "Models", "Materials", "Build Profiles", "Audio clips", "Build logs", "About" };
         public static EditorWindow EditorWindowInstance;
 
         [MenuItem("Tools/WebGL Optimizer")]
@@ -47,15 +48,18 @@ namespace CrazyGames
                     ModelOptimization.RenderGUI();
                     break;
                 case 3:
-                    BuildProfileOptimization.RenderGUI();
+                    MaterialOptimization.RenderGUI();
                     break;
                 case 4:
-                    AudioOptimization.RenderGUI();
+                    BuildProfileOptimization.RenderGUI();
                     break;
                 case 5:
-                    BuildLogs.RenderGUI();
+                    AudioOptimization.RenderGUI();
                     break;
                 case 6:
+                    BuildLogs.RenderGUI();
+                    break;
+                case 7:
                     About.RenderGUI();
                     break;
             }
@@ -99,6 +103,7 @@ namespace CrazyGames
         {
             TextureOptimization.CancelAnalysis();
             ModelOptimization.CancelAnalysis();
+            MaterialOptimization.CancelAnalysis();
             AudioOptimization.CancelAnalysis();
             BuildProfileOptimization.CancelAnalysis();
             BuildLogs.CancelAnalysis();
