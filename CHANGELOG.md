@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.8.1] - 2026-11-01
+
+### Fixed
+- Build-log analysis accepts finite nonnegative percentages above 100 emitted in Unity asset reports, preventing valid rows from being skipped. Invalid sizes and negative/nonfinite percentages remain rejected.
+
 ## [2.8.0] - 2026-10-24
 
 ### Added

@@ -169,7 +169,7 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
                 !float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out size) ||
                 !float.TryParse(parts[2].TrimEnd('%'), NumberStyles.Float, CultureInfo.InvariantCulture, out percentage) ||
                 float.IsNaN(size) || float.IsInfinity(size) || size < 0 ||
-                float.IsNaN(percentage) || float.IsInfinity(percentage) || percentage < 0 || percentage > 100)
+                float.IsNaN(percentage) || float.IsInfinity(percentage) || percentage < 0)
                 throw new FormatException("Invalid asset size or percentage");
             string unit = parts[1].ToLowerInvariant();
             if (unit != "b" && unit != "kb" && unit != "mb" && unit != "gb")
