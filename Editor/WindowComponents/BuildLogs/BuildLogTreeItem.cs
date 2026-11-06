@@ -9,10 +9,10 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
     {
         public readonly float size;
         public readonly string sizeUnit;
-        public readonly float sizePercentage;
+        public float sizePercentage { get; internal set; }
         public readonly string filePath;
 
-        public float sizeInBytes
+        public double sizeInBytes
         {
             get
             {
@@ -21,11 +21,11 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
                     case "b":
                         return size;
                     case "kb":
-                        return size * 1024;
+                        return (double)size * 1024;
                     case "mb":
-                        return size * 1024 * 1024;
+                        return (double)size * 1024 * 1024;
                     case "gb":
-                        return size * 1024 * 1024 * 1024;
+                        return (double)size * 1024 * 1024 * 1024;
                     default:
                         throw new Exception("Unknown size unit " + sizeUnit);
                 }

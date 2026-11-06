@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.9.1] - 2026-11-03
+
+### Fixed
+- Batch build-report reading and parsing with bounded work slices, avoiding the 100-lines-per-Editor-update bottleneck on large logs while retaining cancellation and progress updates.
+
+## [2.9.0] - 2026-11-03
+
+### Added
+- Sortable Build size columns in Textures, Models, Materials, and Audio clips using asset bytes from the latest complete Editor.log build report, with N/A for unavailable or embedded-material sizes and explanations of report freshness and compression.
+
+### Fixed
+- Recalculate build-log percentages from all reported asset sizes, including hidden package assets, so invalid Unity percentages cannot produce shares above 100%; clarify the column as Asset share %.
+
 ## [2.8.1] - 2026-11-01
 
 ### Fixed

@@ -33,6 +33,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
             }
             if (!_hasAnalyzed) AnalyzeModels();
             ActivePlatform.RenderContext(false);
+            EditorGUILayout.LabelField(BuildAssetReport.SizeTooltip, EditorStyles.wordWrappedLabel);
             EditorGUILayout.LabelField("Model import settings apply to all platforms.", EditorStyles.wordWrappedLabel);
             var rect = EditorGUILayout.BeginVertical(GUILayout.MinHeight(300));
             GUILayout.FlexibleSpace();
@@ -119,6 +120,10 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
 
         static IEnumerator<string> AnalyzeModelsSteps(bool includePackages, string contextKey)
         {
+            var buildReport = new BuildAssetReport();
+            foreach (string progress in buildReport.Read(Application.consoleLogPath, _analysis))
+                yield return progress;
+
             var paths = new HashSet<string>();
             foreach (string progress in AssetAnalysis.CollectPaths(path => IsModelAtPath(path), paths, _analysis))
                 yield return progress;
@@ -136,7 +141,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
                     var importer = AssetImporter.GetAtPath(modelPath) as ModelImporter;
                     if (importer == null)
                         throw new InvalidOperationException("Asset has no compatible importer.");
-                    treeElements.Add(new ModelTreeItem("Model", 0, ++idIncrement, modelPath, importer));
+                    treeElements.Add(new ModelTreeItem("Model", 0, ++idIncrement, modelPath, importer) { BuildSize = buildReport.GetSize(modelPath) });
                 }
                 catch (Exception exception) { _analysis.ReportSkipped(modelPath, exception); }
             }
@@ -161,6 +166,8 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
                         { headerContent = new GUIContent() { text = "Mesh compression" }, width = 120, minWidth = 120, canSort = true },
                     new MultiColumnHeaderState.Column()
                         { headerContent = new GUIContent() { text = "Animation compression" }, width = 140, minWidth = 140, canSort = true },
+                    new MultiColumnHeaderState.Column()
+                        { headerContent = new GUIContent("Build size", BuildAssetReport.SizeTooltip), width = 110, minWidth = 100, canSort = true },
                 });
 
             _modelTree = new ModelTree(treeViewState, new MultiColumnHeader(_multiColumnHeaderState), treeModel);

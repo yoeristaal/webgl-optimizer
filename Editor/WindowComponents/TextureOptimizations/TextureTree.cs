@@ -39,6 +39,9 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             var ascending = multiColumnHeader.IsSortedAscending(sortedColumnIndex);
             switch (sortedColumnIndex)
             {
+                case 9:
+                    items = items.Order(i => i.data.BuildSize, ascending);
+                    break;
                 case 0:
                     items = items.Order(i => i.data.TextureName, ascending);
                     break;
@@ -134,6 +137,10 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             CenterRectUsingSingleLineHeight(ref cellRect);
             switch (column)
             {
+                case 9:
+                    var buildSize = item.data.BuildSize;
+                    GUI.Label(cellRect, new GUIContent(buildSize.HasValue ? EditorUtility.FormatBytes((long)buildSize.Value) : "N/A", BuildAssetReport.SizeTooltip));
+                    break;
                 case 0:
                     var reason = item.data.ReviewReason;
                     GUI.Label(cellRect, new GUIContent(item.data.TextureName,

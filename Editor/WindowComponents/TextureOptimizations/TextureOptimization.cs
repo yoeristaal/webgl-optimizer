@@ -118,6 +118,10 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
 
         static IEnumerator<string> AnalyzeTexturesSteps(bool includePackages, string contextKey)
         {
+            var buildReport = new BuildAssetReport();
+            foreach (string progress in buildReport.Read(Application.consoleLogPath, _analysis))
+                yield return progress;
+
             var paths = new HashSet<string>();
             foreach (string progress in AssetAnalysis.CollectPaths(path => AssetDatabase.GetMainAssetTypeAtPath(path) == typeof(Texture2D), paths, _analysis))
                 yield return progress;
@@ -135,7 +139,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                     var importer = AssetImporter.GetAtPath(texturePath) as TextureImporter;
                     if (importer == null)
                         throw new InvalidOperationException("Asset has no compatible importer.");
-                    treeElements.Add(new TextureTreeItem("Texture2D", 0, ++idIncrement, texturePath, importer));
+                    treeElements.Add(new TextureTreeItem("Texture2D", 0, ++idIncrement, texturePath, importer) { BuildSize = buildReport.GetSize(texturePath) });
                 }
                 catch (Exception exception) { _analysis.ReportSkipped(texturePath, exception); }
             }
@@ -162,6 +166,8 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                         {headerContent = new GUIContent() {text = "Format"}, width = 110, minWidth = 110, canSort = true},
                     new MultiColumnHeaderState.Column()
                         {headerContent = new GUIContent("Compressed size", "Imported texture storage size for the active platform, including mipmaps and Crunch where enabled. Final build/download compression can change this size."), width = 115, minWidth = 115, canSort = true},
+                    new MultiColumnHeaderState.Column()
+                        { headerContent = new GUIContent("Build size", BuildAssetReport.SizeTooltip), width = 110, minWidth = 100, canSort = true },
                 });
             _textureCompressionTree = new TextureTree(treeViewState, new MultiColumnHeader(_multiColumnHeaderState), treeModel);
 

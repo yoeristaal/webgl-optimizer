@@ -40,6 +40,9 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
 
             switch (sortedColumnIndex)
             {
+                case 6:
+                    items = items.Order(i => i.data.BuildSize, ascending);
+                    break;
                 case 0:
                     items = items.Order(i => i.data.ModelName, ascending);
                     break;
@@ -124,6 +127,10 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
             CenterRectUsingSingleLineHeight(ref cellRect);
             switch (column)
             {
+                case 6:
+                    var buildSize = item.data.BuildSize;
+                    GUI.Label(cellRect, new GUIContent(buildSize.HasValue ? EditorUtility.FormatBytes((long)buildSize.Value) : "N/A", BuildAssetReport.SizeTooltip));
+                    break;
                 case 0:
                     GUI.Label(cellRect, item.data.ModelName);
                     break;

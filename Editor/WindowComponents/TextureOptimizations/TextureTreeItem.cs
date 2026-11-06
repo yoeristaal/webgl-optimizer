@@ -11,6 +11,7 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
     public class TextureTreeItem : TreeElement
     {
         public string TexturePath { get; }
+        public double? BuildSize { get; internal set; }
         public string TextureName { get; }
         public long? CompressedSize { get { Refresh(); return _compressedSize; } }
         internal string ReviewReason { get { Refresh(); return _reviewReason; } }

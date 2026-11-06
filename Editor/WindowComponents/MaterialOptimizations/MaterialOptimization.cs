@@ -31,6 +31,7 @@ namespace CrazyGames.WindowComponents.MaterialOptimizations
             }
             if (!_hasAnalyzed) AnalyzeMaterials();
             ActivePlatform.RenderContext(false);
+            EditorGUILayout.LabelField(BuildAssetReport.SizeTooltip, EditorStyles.wordWrappedLabel);
             _search = EditorGUILayout.TextField("Search materials", _search);
             var rect = GUILayoutUtility.GetRect(0, 300, GUILayout.ExpandWidth(true));
             if (_tree != null)
@@ -91,6 +92,10 @@ namespace CrazyGames.WindowComponents.MaterialOptimizations
 
         private static IEnumerator<string> AnalyzeSteps(bool includePackages, string contextKey)
         {
+            var buildReport = new BuildAssetReport();
+            foreach (string progress in buildReport.Read(Application.consoleLogPath, _analysis))
+                yield return progress;
+
             var paths = new HashSet<string>();
             foreach (string progress in AssetAnalysis.CollectPaths(
                 path => AssetDatabase.GetMainAssetTypeAtPath(path) == typeof(Material) || AssetImporter.GetAtPath(path) is ModelImporter,
@@ -115,7 +120,7 @@ namespace CrazyGames.WindowComponents.MaterialOptimizations
                 {
                     if (!(asset is Material material) || !seen.Add(material)) continue;
                     yield return "Analyzing material: " + path + " / " + material.name;
-                    try { elements.Add(new MaterialTreeItem(++id, material, path)); }
+                    try { elements.Add(new MaterialTreeItem(++id, material, path) { BuildSize = path.EndsWith(".mat", StringComparison.OrdinalIgnoreCase) ? buildReport.GetSize(path) : null }); }
                     catch (Exception exception) { _analysis.ReportSkipped(path, exception); }
                 }
             }
@@ -134,7 +139,8 @@ namespace CrazyGames.WindowComponents.MaterialOptimizations
                     Column("Textures", "Unique assigned textures per material.", 75),
                     Column("Texture memory", "Editor native texture memory; shared textures repeat across rows. Not build size.", 115),
                     Column("Double-sided GI", "Double-sided contribution to baked global illumination.", 110),
-                    Column("Asset path", "Asset containing the material, including model sub-assets.", 250)
+                    Column("Asset path", "Asset containing the material, including model sub-assets.", 250),
+                    Column("Build size", BuildAssetReport.SizeTooltip, 110)
                 });
             var tree = new MaterialTree(new TreeViewState<int>(), new MultiColumnHeader(_headerState),
                 new TreeModel<MaterialTreeItem>(elements));

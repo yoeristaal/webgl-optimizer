@@ -9,6 +9,7 @@ namespace CrazyGames.WindowComponents.MaterialOptimizations
     {
         public Material Material { get; }
         public string AssetPath { get; }
+        public double? BuildSize { get; internal set; }
         public string ShaderName { get; }
         public int RenderQueue { get; }
         public int PassCount { get; }

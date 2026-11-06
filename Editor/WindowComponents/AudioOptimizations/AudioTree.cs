@@ -40,6 +40,9 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
             var ascending = multiColumnHeader.IsSortedAscending(sortedColumnIndex);
             switch (sortedColumnIndex)
             {
+                case 14:
+                    items = items.Order(i => i.data.BuildSize, ascending);
+                    break;
                 case 0:
                     items = items.Order(i => i.data.AudioName, ascending);
                     break;
@@ -147,6 +150,10 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
             CenterRectUsingSingleLineHeight(ref cellRect);
             switch (column)
             {
+                case 14:
+                    var buildSize = item.data.BuildSize;
+                    GUI.Label(cellRect, new GUIContent(buildSize.HasValue ? EditorUtility.FormatBytes((long)buildSize.Value) : "N/A", BuildAssetReport.SizeTooltip));
+                    break;
                 case 0:
                     GUI.Label(cellRect, new GUIContent(item.data.AudioName, item.data.AudioPath));
                     break;

@@ -118,6 +118,10 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
 
         static IEnumerator<string> AnalyzeAudioSteps(bool includePackages, string contextKey)
         {
+            var buildReport = new BuildAssetReport();
+            foreach (string progress in buildReport.Read(Application.consoleLogPath, _analysis))
+                yield return progress;
+
             var paths = new HashSet<string>();
             foreach (string progress in AssetAnalysis.CollectPaths(path => AssetDatabase.GetMainAssetTypeAtPath(path) == typeof(AudioClip), paths, _analysis))
                 yield return progress;
@@ -135,7 +139,7 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
                     var importer = AssetImporter.GetAtPath(audioPath) as AudioImporter;
                     if (importer == null)
                         throw new InvalidOperationException("Asset has no compatible importer.");
-                    treeElements.Add(new AudioTreeItem("AudioClip", 0, ++idIncrement, audioPath, importer));
+                    treeElements.Add(new AudioTreeItem("AudioClip", 0, ++idIncrement, audioPath, importer) { BuildSize = buildReport.GetSize(audioPath) });
                 }
                 catch (Exception exception) { _analysis.ReportSkipped(audioPath, exception); }
             }
@@ -164,6 +168,8 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
                     new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Force to Mono", "Whether the importer converts the audio to a single channel."), width = 110, minWidth = 100, canSort = true },
                     new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Preload Audio Data", "Whether the active platform preloads audio data. N/A for Streaming, where this setting is ignored."), width = 140, minWidth = 130, canSort = true },
                     new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Load in Background", "Whether the importer enables asynchronous audio loading."), width = 145, minWidth = 135, canSort = true },
+                    new MultiColumnHeaderState.Column()
+                        { headerContent = new GUIContent("Build size", BuildAssetReport.SizeTooltip), width = 110, minWidth = 100, canSort = true },
                 });
             _audioCompressionTree = new AudioTree(treeViewState, new MultiColumnHeader(_multiColumnHeaderState), treeModel);
 

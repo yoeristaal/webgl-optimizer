@@ -48,6 +48,7 @@ namespace CrazyGames.WindowComponents.MaterialOptimizations
                 case 6: return item.TextureCount;
                 case 7: return item.TextureMemory;
                 case 8: return item.DoubleSidedGI;
+                case 10: return item.BuildSize ?? -1;
                 default: return item.AssetPath;
             }
         }
@@ -72,9 +73,10 @@ namespace CrazyGames.WindowComponents.MaterialOptimizations
                     case 6: value = item.TextureCount.ToString(); break;
                     case 7: value = item.TextureMemory < 0 ? "N/A" : EditorUtility.FormatBytes(item.TextureMemory); break;
                     case 8: value = item.DoubleSidedGI ? "yes" : "no"; break;
+                    case 10: value = item.BuildSize.HasValue ? EditorUtility.FormatBytes((long)item.BuildSize.Value) : "N/A"; break;
                     default: value = item.AssetPath; break;
                 }
-                GUI.Label(rect, new GUIContent(value, column == 5 ? item.Keywords : item.AssetPath));
+                GUI.Label(rect, new GUIContent(value, column == 5 ? item.Keywords : column == 10 ? BuildAssetReport.SizeTooltip : item.AssetPath));
             }
         }
 

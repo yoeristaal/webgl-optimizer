@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
-using System.IO;
 using CrazyGames;
 using CrazyGames.TreeLib;
 using UnityEditor;
@@ -67,7 +65,7 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
             EditorGUILayout.Space(5);
 
             GUILayout.Label(
-                "This utility analyzes the Build Report from the Editor.log file. It will display all the files included in your final build, and the memory they occupy. You can use this utility to detect more opportunities to decrease the final build size. There may be textures that still occupy a lot of memory, uncompressed sounds, or stuff forgotten in the Resources folders that gets included in the build.",
+                "This utility analyzes the Build Report from the Editor.log file. It displays asset sizes from the latest complete report, before build/download compression. Asset share is calculated from all listed assets, including hidden packages; it excludes build overhead. You can use this utility to detect more opportunities to decrease the final build size. There may be textures that still occupy a lot of memory, uncompressed sounds, or stuff forgotten in the Resources folders that gets included in the build.",
                 EditorStyles.wordWrappedLabel);
         }
 
@@ -85,62 +83,16 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
         static IEnumerator<string> AnalyzeBuildLogsSteps(bool includePackages)
         {
             yield return "Reading the latest build report...";
-            var reportLines = new List<string>();
-            bool readingReport = false;
-            bool readingAssets = false;
-            bool complete = false;
-            long lineNumber = 0;
-            // Stream the log rather than copying and loading the entire file. Iterator
-            // disposal closes the stream on cancellation, failure, and assembly reload.
-            using (var stream = new FileStream(GetEditorLogPath(), FileMode.Open, FileAccess.Read,
-                FileShare.ReadWrite | FileShare.Delete))
-            using (var reader = new StreamReader(stream))
-            {
-                string line;
-                while ((line = reader.ReadLine()) != null)
-                {
-                    yield return $"Reading Editor.log: line {++lineNumber}";
-                    string trimmed = line.Trim();
-                    if (trimmed == "Build Report" || trimmed.StartsWith("Uncompressed usage by category", StringComparison.Ordinal))
-                    {
-                        reportLines.Clear();
-                        readingReport = true;
-                        readingAssets = false;
-                        complete = false;
-                    }
-                    else if (readingReport && trimmed.StartsWith("Used Assets and files from the Resources folder", StringComparison.Ordinal))
-                    {
-                        readingAssets = true;
-                    }
-                    else if (readingAssets && trimmed.StartsWith("------------", StringComparison.Ordinal))
-                    {
-                        readingAssets = false;
-                        readingReport = false;
-                        complete = true;
-                    }
-                    else if (readingAssets && trimmed.Length > 0)
-                    {
-                        reportLines.Add(trimmed);
-                    }
-                }
-            }
-            if (!complete)
-                throw new InvalidDataException("No complete asset report was found in Editor.log. Build the project and try again");
-
+            var report = new BuildAssetReport();
+            foreach (string progress in report.Read(GetEditorLogPath(), _analysis, true))
+                yield return progress;
             var treeElements = new List<BuildLogTreeItem>();
             treeElements.Add(new BuildLogTreeItem("Root", -1, 0, 0, "", 0, ""));
-            int idIncrement = 0;
-            foreach (string line in reportLines)
+            foreach (var entry in report.Entries)
             {
-                yield return $"Parsing build assets: {++idIncrement}/{reportLines.Count}";
-                try
-                {
-                    var entry = ParseAssetLine(line, idIncrement);
-                    if (entry.filePath.StartsWith("Packages/", StringComparison.Ordinal) && !includePackages)
-                        continue;
-                    treeElements.Add(entry);
-                }
-                catch (Exception exception) { _analysis.ReportSkipped(line, exception); }
+                if (entry.filePath.StartsWith("Packages/", StringComparison.Ordinal) && !includePackages)
+                    continue;
+                treeElements.Add(entry);
             }
 
             yield return "Building results table...";
@@ -150,7 +102,7 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
             {
                 // when adding a new column don't forget to check the sorting method, and the CellGUI method
                 new MultiColumnHeaderState.Column() {headerContent = new GUIContent() {text = "Size"}, width = 80, minWidth = 60, canSort = true},
-                new MultiColumnHeaderState.Column() {headerContent = new GUIContent() {text = "Size %"}, width = 60, minWidth = 40, canSort = true},
+                new MultiColumnHeaderState.Column() {headerContent = new GUIContent("Asset share %", "Share of all listed asset bytes, including hidden package assets. Excludes build overhead and download compression."), width = 110, minWidth = 100, canSort = true},
                 new MultiColumnHeaderState.Column() {headerContent = new GUIContent() {text = "Path"}, width = 300, minWidth = 200, canSort = true},
             });
             _buildLogTree = new BuildLogTree(treeViewState, new MultiColumnHeader(_multiColumnHeaderState), treeModel);
@@ -162,22 +114,7 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
         }
         internal static BuildLogTreeItem ParseAssetLine(string line, int id)
         {
-            var parts = line.Split(new[] { ' ', '\t' }, 4, StringSplitOptions.RemoveEmptyEntries);
-            float size;
-            float percentage;
-            if (parts.Length != 4 || !parts[2].EndsWith("%", StringComparison.Ordinal) ||
-                !float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out size) ||
-                !float.TryParse(parts[2].TrimEnd('%'), NumberStyles.Float, CultureInfo.InvariantCulture, out percentage) ||
-                float.IsNaN(size) || float.IsInfinity(size) || size < 0 ||
-                float.IsNaN(percentage) || float.IsInfinity(percentage) || percentage < 0)
-                throw new FormatException("Invalid asset size or percentage");
-            string unit = parts[1].ToLowerInvariant();
-            if (unit != "b" && unit != "kb" && unit != "mb" && unit != "gb")
-                throw new FormatException("Unsupported size unit: " + parts[1]);
-            string path = parts[3].Trim();
-            if (path.Length == 0)
-                throw new FormatException("Missing asset path");
-            return new BuildLogTreeItem("BuildLogLine", 0, id, size, unit, percentage, path);
+            return BuildAssetReport.ParseAssetLine(line, id);
         }
     }
 }

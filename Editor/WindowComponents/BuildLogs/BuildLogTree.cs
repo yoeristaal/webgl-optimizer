@@ -117,7 +117,7 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
                     GUI.Label(cellRect, $"{item.data.size} {item.data.sizeUnit}");
                     break;
                 case 1:
-                    GUI.Label(cellRect, $"{item.data.sizePercentage}%");
+                    GUI.Label(cellRect, $"{item.data.sizePercentage:0.##}%");
                     break;
                 case 2:
                     GUI.Label(cellRect, item.data.filePath);

@@ -8,6 +8,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
     public class ModelTreeItem : TreeElement
     {
         public string ModelPath { get; }
+        public double? BuildSize { get; internal set; }
         public string ModelName { get; }
 
         public bool IsReadWriteEnabled => _modelImporter.isReadable;

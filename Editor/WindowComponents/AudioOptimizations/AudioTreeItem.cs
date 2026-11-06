@@ -9,6 +9,7 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
     public class AudioTreeItem : TreeElement
     {
         public string AudioPath { get; }
+        public double? BuildSize { get; internal set; }
         public string AudioName { get; }
 
         public string LoadType
