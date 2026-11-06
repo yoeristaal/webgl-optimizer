@@ -1,0 +1,4 @@
+{
+  "name": "WebGLOptimizer.Editor",
+  "includePlatforms": ["Editor"]
+}

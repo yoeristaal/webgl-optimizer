@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.9.2] - 2026-11-06
+
+### Fixed
+- Define an Editor-only assembly for the Unity package so its tree and build-log helpers compile alongside the optimizer.
+
 ## [2.9.1] - 2026-11-03
 
 ### Fixed
